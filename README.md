@@ -26,22 +26,37 @@ The page contains **no student names**. Class lists are typed or imported on eac
 Use the school's Google account (or your own school account for the pilot; see "Moving the form to the office later" below).
 
 1. Go to **forms.google.com** and start a blank form. Name it something like "Tardy Kiosk Log."
-2. Add these questions. **Make every one a "Short answer" question**, not multiple choice. The kiosk fills them in for you, and short answer accepts anything it sends.
-   - **Room**
-   - **Student**
-   - **Type** (the kiosk sends "Tardy." Later it will also send hall pass types.)
-   - **Reason** (Bus, Office, Another teacher, Other, or blank)
-   - **Class** *(recommended)*. The kiosk sends the class name, like "Period 3 – World History."
-   - **Kiosk time** *(recommended)*. This is the time the student actually tapped. It matters because if the internet is down, a check-in might reach Google later, and Google's own timestamp would show that later time.
-3. Leave every question **not required**.
-4. Open the **Responses** tab and click **Link to Sheets** to create the Sheet. This Sheet is the shared record.
-5. Open **Settings** (the gear at the top) › **Responses**. For the first test, leave the sign-in settings as they are. Step 4 explains what to change if the test doesn't arrive.
+2. Add these seven questions **in this order**. Make every one a **Short answer** question, and leave **Required turned off** on all of them.
 
-**Get the pre-filled link** (the kiosk reads its secret question codes from this link):
+| # | Question title | What the kiosk fills in |
+|---|---|---|
+| 1 | `Room` | Room 14 |
+| 2 | `Student` | Maya Rivera |
+| 3 | `Type` | Tardy, Hall pass out, Back, or Not signed back in |
+| 4 | `Reason` | Why they were late, or where they went on a hall pass |
+| 5 | `Class` | Period 3 – World History |
+| 6 | `Kiosk time` | The time the student actually tapped |
+| 7 | `Minutes out` | How long a hall pass lasted (blank for tardies) |
+
+   **Why no Required questions?** If a required question arrives blank, Google rejects the whole entry, and the kiosk has no way to know. Reason and Minutes out are often blank on purpose.
+
+   **Why Kiosk time?** If the internet is down, a check-in may reach Google later. Google's Timestamp column shows when it *arrived*; Kiosk time shows when the student *tapped*.
+
+3. Open the **Settings** tab › **Responses**:
+   - **Collect email addresses:** **Do not collect.** ("Verified" requires a sign-in, which silently blocks the kiosk.)
+   - **Limit to 1 response:** off.
+4. Open the **Responses** tab and click **Link to Sheets** › **Create a new spreadsheet**. Its columns will be: Timestamp, Room, Student, Type, Reason, Class, Kiosk time, Minutes out. This Sheet is the shared record.
+5. **Publish the form.** New Google Forms start out unpublished and won't accept anything until you click **Publish** (top right). When it asks who can respond, choose **anyone with the link** (see Step 4 for why).
+
+**Get the pre-filled link** (this is how the kiosk learns each question's hidden code):
 
 1. In the form editor, click the **⋮** menu (top right) › **Get pre-filled link**.
-2. Type these exact words in the boxes: `room` in Room, `student` in Student, `type` in Type, `reason` in Reason, `class` in Class, and `time` in Kiosk time.
-3. Click **Get link**, then **Copy link**. Paste it somewhere safe, like an email to yourself.
+2. Type these words in the boxes: `room`, `student`, `type`, `reason`, `class`, `time`, `minutes` (one in each matching box).
+3. Click **Get link**, then **Copy link**. Paste it somewhere safe.
+
+This doesn't submit anything. The words are just labels so the kiosk can tell which hidden code belongs to which question.
+
+**Later changes:** renaming questions or changing settings is fine. But if you **delete and re-add a question, or change its type**, Google gives it a new hidden code. Then make a new pre-filled link and paste it into setup again (or into one kiosk, then send out a new setup code).
 
 ---
 
@@ -63,7 +78,7 @@ That address is your kiosk. Bookmark it.
 ## Step 3: Set up a kiosk device
 
 1. On the Chromebook or tablet, open your kiosk address.
-2. **Create a 4-digit teacher PIN** (you type it twice). Pick one students won't guess.
+2. **Create a 4-digit teacher PIN** (you enter it twice). Tap the number pad, or type it on the keyboard: number keys enter digits, Backspace erases one, and Esc cancels. Pick one students won't guess.
 3. In **Teacher setup**:
    - **1. Connect your Google Form:** paste the pre-filled link and click **Read link**. Each answer box is listed with a guess at which question it belongs to. Check the guesses, then click **Save form connection**.
    - **2. This room:** type the room name, like `Room 14`. **Type it exactly the same way every time.** The office and teacher reports sort by this name.
@@ -71,7 +86,7 @@ That address is your kiosk. Bookmark it.
    - **Which class shows on the kiosk:** "Switch automatically by bell schedule" shows the class that's in session (starting 5 minutes before the bell). Between classes, students see a "Which class are you late to?" screen. You can also choose to always show one class.
 4. Click **Save & back to kiosk**.
 
-To get back into setup, tap the small **gear** in the top corner and enter your PIN. Setup locks itself after 5 idle minutes.
+To get back into setup, tap or click the small **gear** in the top corner and enter your PIN. Setup locks itself after 5 idle minutes.
 
 ---
 
@@ -82,14 +97,18 @@ To get back into setup, tap the small **gear** in the top corner and enter your 
 
 **If the test shows up:** you're done. Delete the TEST row whenever you like.
 
-**If the test doesn't show up:**
+**If the test doesn't show up,** check these in order:
 
-The most likely cause is that the form only accepts people signed in to a school account. The kiosk sends in the background, and Google may quietly turn that away. Here's what to do:
+1. **Is the form published?** The Publish button is top right in the form editor.
+2. **Collect email addresses** must be **Do not collect**, not "Verified."
+3. **Who can respond** (in the Publish settings, or Settings › Responses › "Restrict to users in [your school]") should allow **anyone with the link**. The kiosk sends in the background without signing in, so a school-only form quietly turns it away.
+4. **No question is marked Required.**
+5. The form says **Accepting responses** on its Responses tab.
+6. You're looking at the right Sheet: on the form's Responses tab, click **View in Sheets**.
 
-1. In the form, go to **Settings › Responses** and turn off **"Restrict to users in [your school] and its trusted organizations."** Also make sure **"Collect email addresses"** is set to **Do not collect**, and **"Limit to 1 response"** is off.
-2. Click **Send a test entry** again and check the Sheet.
+A handy check: open the form's normal link in an **Incognito window** (Ctrl+Shift+N). If it asks you to sign in, so will the kiosk.
 
-**The trade-off:** with sign-in turned off, anyone who found the form's address could submit junk entries. The risk is small, since the address isn't shown anywhere students can see. Still, it's worth knowing about, and junk rows are easy to spot and delete. On a school-managed Chromebook signed into a school account, the restricted setting *sometimes* works. Test it on your actual device before deciding.
+**The trade-off:** with "anyone with the link," someone who found the form's address could submit junk entries. The risk is small, since the address isn't shown anywhere students can see, and junk rows are easy to spot and delete.
 
 ---
 
@@ -105,6 +124,46 @@ The most likely cause is that the form only accepts people signed in to a school
 - **Today on this device** (in setup) lists today's check-ins on that kiosk, marked Sent or Waiting.
 
 **Important:** "Sent" means the device handed the check-in to Google. Google doesn't send a reply back, so the kiosk can't confirm it arrived. The Sheet is always the real record.
+
+---
+
+## Hall passes
+
+Hall passes are **off** until you turn them on in setup, section **6. Hall passes**.
+
+**What students do**
+
+- **Going out:** tap your name › **Hall pass: going out** › tap where you're going. The green screen says "You're signed out at 10:31."
+- **Coming back:** tap your name in the **Out now** strip at the top of the name screen (or in the name grid) › **I'm back**. The screen says how long they were out.
+- With hall passes on, the name screen says "Tap your name." and shows three buttons: I'm late, Hall pass: going out, and I'm back. "I'm back" only works for a student who is out.
+
+**Rules you can set** (section 6)
+
+| Setting | Default |
+|---|---|
+| Students out at once | 1 |
+| Passes per student per week (0 = no limit) | 0 |
+| Timer turns gold after | 5 minutes |
+| Timer turns red after | 10 minutes |
+| No passes in the first ___ minutes of class | 10 |
+| No passes in the last ___ minutes of class | 10 |
+| Show who is out on the kiosk | On (first name + last initial) |
+| Beep once when a timer turns red | Off |
+| Places students can go | Bathroom, Water fountain, Nurse, Office, Locker, Another teacher |
+
+When a rule blocks a pass, the "going out" button is grayed out and the kiosk says why (for example, "Wait until Jordan T. is back."). For emergencies, like a student who needs the nurse during a blocked time, use a paper pass or your usual process.
+
+**Forgot to sign back in?** The pass closes itself at the end of the class (or after an hour if no class is set) and the Sheet records **Not signed back in**. In setup, **Out right now** lists everyone out with a **Mark back** button; those rows say "(marked back by teacher)."
+
+**What goes in the Sheet**
+
+| Type | Reason | Minutes out |
+|---|---|---|
+| Hall pass out | where they went | blank |
+| Back | where they went | minutes |
+| Not signed back in | where they went | minutes until the pass closed |
+
+**Limits to know about:** each kiosk only knows its own room's passes. It can't see that a student is out from another room, and the weekly limit only counts passes from this device. Hall pass settings are per device, and they're not included in setup codes.
 
 ---
 
@@ -128,7 +187,7 @@ Every room uses the **same form and Sheet**, so you don't make a new form per te
 2. In cell A1, paste this (replace the link with the main Sheet's address and the room name with the teacher's):
 
    ```
-   =QUERY(IMPORTRANGE("PASTE-MAIN-SHEET-LINK-HERE", "Form Responses 1!A:G"), "select * where Col2 = 'Room 14'", 1)
+   =QUERY(IMPORTRANGE("PASTE-MAIN-SHEET-LINK-HERE", "Form Responses 1!A:H"), "select * where Col2 = 'Room 14'", 1)
    ```
 
    `Col2` means the second column. That's Room if Room is the first question on the form (the first column is always Google's timestamp). If you added the questions in a different order, change the number.
@@ -158,7 +217,7 @@ Synergy's own KioskVUE is worth asking about too. If your district already suppo
 
 - The website has no student names. Names live only in each device's browser and in the school-owned Google Sheet.
 - Name buttons show first name + last initial (or the full last name if two students share a first name and initial).
-- Use **Erase everything on this device** (setup section 6) before reassigning or recycling a device.
+- Use **Erase everything on this device** (setup section 7) before reassigning or recycling a device.
 
 ---
 
@@ -172,4 +231,4 @@ Sending to a Google Form's response address is a long-standing method, but it is
 
 At the top of `app.js` there's a short "Settings you might want to change" list: how long each screen waits before resetting, the 10-minute duplicate window, and how often it retries. Change a number, upload the file to GitHub, and you're done.
 
-The reasons (Bus, Office, Another teacher, Other) are the four buttons in `index.html`; search for `data-reason`.
+The late reasons (Bus, Office, Another teacher, Other) are the four buttons in `index.html`; search for `data-reason`. Hall pass destinations are set in the setup screen, no file editing needed.

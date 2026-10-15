@@ -11,14 +11,15 @@
     pickclass: 30000,
     done: 4000,        // confirmation screen
     pin: 30000,
+    dest: 20000,
     setup: 5 * 60000   // setup locks itself after 5 idle minutes
   };
   const DUPLICATE_WINDOW_MIN = 10; // same student tapping again within 10 min isn't sent twice
   const RETRY_MS = 30000;
-  const LOG_KEEP = 400;
+  const LOG_KEEP = 3000; // enough history for weekly hall pass limits
 
   // ---------- Storage ----------
-  const K = { config: 'tk.config', classes: 'tk.classes', queue: 'tk.queue', log: 'tk.log' };
+  const K = { config: 'tk.config', classes: 'tk.classes', queue: 'tk.queue', log: 'tk.log', out: 'tk.out' };
   function load(key, fallback) {
     try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; }
   }
@@ -31,6 +32,14 @@
   let classes = load(K.classes, []);
   let queue = load(K.queue, []);
   let log = load(K.log, []);
+  let out = load(K.out, []); // hall passes open on this device
+  const saveOut = () => save(K.out, out);
+  const HALL_DEFAULTS = {
+    enabled: false, maxOut: 1, warnMin: 5, alertMin: 10, noStart: 10, noEnd: 10, weekLimit: 0,
+    showNames: true, beep: false,
+    dests: ['Bathroom', 'Water fountain', 'Nurse', 'Office', 'Locker', 'Another teacher']
+  };
+  const hall = () => Object.assign({}, HALL_DEFAULTS, config.hall || {});
   const saveConfig = () => save(K.config, config);
   const saveClasses = () => save(K.classes, classes);
   const saveQueue = () => save(K.queue, queue);
@@ -51,10 +60,13 @@
   const toMin = (t) => { const p = String(t || '').split(':'); return (+p[0]) * 60 + (+p[1] || 0); };
   const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
   function sameDay(a, b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
-  function fmt12(t) { if (!t) return ''; const m = toMin(t); const h = Math.floor(m / 60); return ((h % 12) || 12) + ':' + pad(m % 60); }
+  function fmtMin(m) { const h = Math.floor(m / 60); return ((h % 12) || 12) + ':' + pad(m % 60); }
+  function fmt12(t) { return t ? fmtMin(toMin(t)) : ''; }
+  function mmss(ms) { const s = Math.max(0, Math.floor(ms / 1000)); return Math.floor(s / 60) + ':' + pad(s % 60); }
+  function weekStart() { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; }
 
   // ---------- Screens & idle timers ----------
-  const STUDENT_SCREENS = ['names', 'pickclass', 'hello', 'notlisted'];
+  const STUDENT_SCREENS = ['names', 'pickclass', 'hello', 'notlisted', 'dest'];
   let current = '';
   let idleTimer = null;
 
@@ -66,7 +78,7 @@
     $('where').hidden = !onNames;
     $('btn-gear').hidden = !onNames;
     $('btn-back').hidden = onNames;
-    $('btn-back-label').textContent = name === 'hello' ? "That's not me" : 'Back to names';
+    $('btn-back-label').textContent = name === 'hello' ? "That's not me" : name === 'dest' ? 'Cancel' : 'Back to names';
     armIdle();
     window.scrollTo(0, 0);
   }
@@ -74,7 +86,7 @@
     clearTimeout(idleTimer);
     const ms = TIMEOUTS[current];
     if (!ms || current === 'done') return;
-    idleTimer = setTimeout(() => { goHome(); }, ms);
+    idleTimer = setTimeout(() => { if (current === 'setup') saveSetupFields(); goHome(); }, ms);
   }
   ['pointerdown', 'keydown', 'input'].forEach((ev) => document.addEventListener(ev, armIdle, { passive: true }));
 
@@ -119,6 +131,8 @@
   function renderNames(cls) {
     showingClass = cls;
     updateWhere(cls);
+    $('names-title').textContent = hall().enabled ? 'Tap your name.' : 'Arriving late? Tap your name.';
+    renderOutStrip();
     const grid = $('name-grid');
     grid.textContent = '';
     const empty = $('names-empty');
@@ -137,7 +151,7 @@
       b.appendChild(el('span', 'first', n.first));
       if (n.lastShown) b.appendChild(el('span', 'last', n.lastShown));
       b.setAttribute('aria-label', n.first + ' ' + n.lastShown);
-      b.addEventListener('click', () => openHello(n.full, n.first, false));
+      b.addEventListener('click', () => openHello(n.full, n.first, false, n.first + (n.lastShown ? ' ' + n.lastShown : '')));
       grid.appendChild(b);
     });
   }
@@ -158,13 +172,32 @@
   }
 
   // ---------- Hello / reasons ----------
-  let pending = null; // { full, first, typed }
+  let pending = null; // { full, first, typed, label }
   let reason = '';
-  function openHello(full, first, typed) {
-    pending = { full, first, typed };
+  function openHello(full, first, typed, label) {
+    pending = { full, first, typed, label: label || first };
     reason = '';
     document.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', 'false'));
     $('hello-name').textContent = 'Hi, ' + first + '!';
+    const h = hall();
+    const mine = out.find((o) => o.student === full);
+    const note = $('hall-note');
+    note.hidden = true;
+    $('action-row').classList.toggle('three', h.enabled && !mine);
+    $('reasons').hidden = !!mine;
+    $('btn-late').hidden = !!mine;
+    $('btn-out').hidden = !h.enabled || !!mine;
+    $('btn-backin').hidden = !h.enabled && !mine;
+    $('btn-backin').disabled = !mine;
+    $('reason-q').innerHTML = h.enabled ? 'If you\'re late, why? <em>(optional)</em>' : 'Why are you late? <em>(optional — skip if you want)</em>';
+    if (mine) {
+      note.textContent = 'Out for ' + mmss(Date.now() - new Date(mine.at)) + ' · ' + mine.dest;
+      note.hidden = false;
+    } else if (h.enabled) {
+      const why = passBlock(full);
+      $('btn-out').disabled = !!why;
+      if (why) { note.textContent = why; note.hidden = false; }
+    }
     show('hello');
   }
   document.querySelectorAll('.chip').forEach((chip) => {
@@ -177,6 +210,12 @@
   $('btn-late').addEventListener('click', () => {
     if (!pending) return goHome();
     checkIn(pending.typed ? pending.full + ' (typed in)' : pending.full, pending.first, 'Tardy', reason);
+  });
+  $('btn-out').addEventListener('click', () => { if (pending) openDest(); });
+  $('btn-backin').addEventListener('click', () => {
+    if (!pending) return goHome();
+    const o = out.find((x) => x.student === pending.full);
+    if (o) comeBack(o, 'student'); else goHome();
   });
 
   // ---------- Not on the list ----------
@@ -196,29 +235,151 @@
   $('btn-back').addEventListener('click', goHome);
 
   // ---------- Check in ----------
+  function record(student, type, why, minutes, test) {
+    const now = new Date();
+    const entry = {
+      id: uid(), at: now.toISOString(), room: config.room || '', student,
+      cls: showingClass ? showingClass.name : '', type, reason: why || '', minutes: minutes == null ? '' : String(minutes), test: !!test
+    };
+    queue.push(entry); saveQueue();
+    log.unshift({ id: entry.id, at: entry.at, student, type, reason: entry.reason, minutes: entry.minutes, sent: false, test: !!test });
+    log = log.slice(0, LOG_KEEP); saveLog();
+    flushQueue();
+    return entry;
+  }
+
   function checkIn(student, first, type, why) {
     const now = new Date();
     const recent = log.find((e) => e.student === student && e.type === type && !e.test &&
       (now - new Date(e.at)) < DUPLICATE_WINDOW_MIN * 60000);
-    if (recent) { showDone(first, new Date(recent.at), recent.reason, true); return; }
+    if (recent) {
+      showDone('You already checked in at ' + clockText(new Date(recent.at)) + '.', 'Have a seat, ' + first + '.', 'Late' + (recent.reason ? ' · ' + recent.reason : ''));
+      return;
+    }
+    record(student, type, why, '');
+    showDone("You're checked in at " + clockText(now) + '.', 'Have a seat, ' + first + '.', 'Late' + (why ? ' · ' + why : ''));
+  }
 
-    const cls = showingClass;
-    const entry = {
-      id: uid(), at: now.toISOString(), room: config.room || '', student,
-      cls: cls ? cls.name : '', type, reason: why || '', test: false
-    };
-    queue.push(entry); saveQueue();
-    log.unshift({ id: entry.id, at: entry.at, student, type, reason: entry.reason, sent: false, test: false });
-    log = log.slice(0, LOG_KEEP); saveLog();
-    flushQueue();
-    showDone(first, now, entry.reason, false);
+  // ---------- Hall passes ----------
+  function passBlock(full) {
+    const h = hall(), now = nowMin();
+    if (out.length >= h.maxOut) {
+      if (!h.showNames) return 'Someone is already out. Wait until they\'re back.';
+      const who = out.map((o) => o.label);
+      return 'Wait until ' + who.join(' and ') + (who.length > 1 ? ' are' : ' is') + ' back.';
+    }
+    const c = showingClass;
+    if (c && c.start && c.end) {
+      const st = toMin(c.start), en = toMin(c.end);
+      if (h.noStart > 0 && now >= st - 5 && now < st + h.noStart) return 'Hall passes start at ' + fmtMin(st + h.noStart) + '.';
+      if (h.noEnd > 0 && now >= en - h.noEnd && now <= en) return 'No hall passes in the last ' + h.noEnd + ' minutes of class.';
+    }
+    if (h.weekLimit > 0) {
+      const since = weekStart();
+      const used = log.filter((l) => l.student === full && l.type === 'Hall pass out' && new Date(l.at) >= since).length;
+      if (used >= h.weekLimit) return 'You\'ve used your ' + h.weekLimit + ' hall pass' + (h.weekLimit === 1 ? '' : 'es') + ' this week. Ask your teacher.';
+    }
+    return '';
+  }
+
+  function openDest() {
+    const grid = $('dest-grid'); grid.textContent = '';
+    $('dest-title').textContent = 'Where are you going, ' + pending.first + '?';
+    hall().dests.forEach((d) => {
+      const b = el('button', 'dest-btn', d); b.type = 'button';
+      b.addEventListener('click', () => goOut(d));
+      grid.appendChild(b);
+    });
+    show('dest');
+  }
+
+  function goOut(dest) {
+    if (!pending) return goHome();
+    const why = passBlock(pending.full);
+    if (why) { openHello(pending.full, pending.first, false, pending.label); return; }
+    const now = new Date();
+    let until = now.getTime() + 60 * 60000;
+    if (showingClass && showingClass.end) {
+      const e = new Date(now); e.setHours(0, 0, 0, 0); e.setMinutes(toMin(showingClass.end));
+      if (e > now) until = Math.min(until, e.getTime());
+    }
+    record(pending.full, 'Hall pass out', dest, '');
+    out.push({ id: uid(), student: pending.full, first: pending.first, label: pending.label, dest, at: now.toISOString(), until, alerted: false });
+    saveOut();
+    showDone("You're signed out at " + clockText(now) + '.', 'Go straight there and back, ' + pending.first + '.', 'Hall pass · ' + dest + ' · Tap “I\'m back” when you return');
+  }
+
+  function comeBack(o, how) {
+    const mins = Math.max(1, Math.round((Date.now() - new Date(o.at)) / 60000));
+    const type = how === 'auto' ? 'Not signed back in' : 'Back';
+    const why = o.dest + (how === 'teacher' ? ' (marked back by teacher)' : '');
+    record(o.student, type, why, mins);
+    out = out.filter((x) => x.id !== o.id); saveOut();
+    if (how === 'student') {
+      showDone('Welcome back, ' + o.first + '!', 'You were out ' + mins + ' minute' + (mins === 1 ? '' : 's') + '.', 'Back at ' + clockText(new Date()) + ' · Have a seat');
+    } else {
+      renderOutStrip();
+      if (current === 'setup') renderSetupOut();
+    }
+  }
+
+  function renderOutStrip() {
+    const strip = $('out-strip'), chips = $('out-chips');
+    const h = hall();
+    if (!out.length) { strip.hidden = true; return; }
+    strip.hidden = false;
+    chips.textContent = '';
+    const now = Date.now();
+    const level = (ms) => ms >= h.alertMin * 60000 ? ' alert' : ms >= h.warnMin * 60000 ? ' warn' : '';
+    if (!h.showNames) {
+      const longest = Math.max.apply(null, out.map((o) => now - new Date(o.at)));
+      const c = el('span', 'out-chip' + level(longest));
+      c.appendChild(el('span', null, out.length + ' student' + (out.length === 1 ? '' : 's') + ' out'));
+      c.appendChild(el('span', 't', mmss(longest)));
+      chips.appendChild(c);
+      return;
+    }
+    out.forEach((o) => {
+      const ms = now - new Date(o.at);
+      const b = el('button', 'out-chip' + level(ms)); b.type = 'button';
+      b.appendChild(el('span', null, o.label));
+      b.appendChild(el('span', 't', mmss(ms)));
+      b.setAttribute('aria-label', o.label + ', out ' + mmss(ms) + '. Tap to sign back in.');
+      b.addEventListener('click', () => openHello(o.student, o.first, false, o.label));
+      chips.appendChild(b);
+    });
+  }
+
+  function hallTick() {
+    const h = hall(), now = Date.now();
+    out.slice().forEach((o) => {
+      if (now >= o.until) { comeBack(o, 'auto'); return; }
+      if (!o.alerted && now - new Date(o.at) >= h.alertMin * 60000) {
+        o.alerted = true; saveOut();
+        if (h.beep) beep();
+      }
+    });
+    if (current === 'names') renderOutStrip();
+    if (current === 'setup') renderSetupOut(true);
+  }
+  setInterval(hallTick, 1000);
+
+  let audioCtx = null;
+  function beep() {
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.frequency.value = 880; g.gain.value = 0.15;
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(); o.stop(audioCtx.currentTime + 0.4);
+    } catch (e) { /* no sound available */ }
   }
 
   let doneTimer = null;
-  function showDone(first, when, why, already) {
-    $('done-title').textContent = (already ? 'You already checked in at ' : "You're checked in at ") + clockText(when) + '.';
-    $('done-seat').textContent = 'Have a seat, ' + first + '.';
-    $('done-detail').textContent = 'Late' + (why ? ' · ' + why : '');
+  function showDone(title, seat, detail) {
+    $('done-title').textContent = title;
+    $('done-seat').textContent = seat;
+    $('done-detail').textContent = detail;
     const bar = $('done-bar');
     bar.classList.remove('run'); void bar.offsetWidth;
     bar.style.setProperty('--done-ms', TIMEOUTS.done + 'ms');
@@ -236,7 +397,7 @@
     const m = config.map || {}, p = new URLSearchParams();
     const add = (field, value) => { if (m[field]) p.append(m[field], value); };
     add('room', e.room); add('student', e.student); add('type', e.type);
-    add('reason', e.reason); add('cls', e.cls); add('time', stamp(new Date(e.at)));
+    add('reason', e.reason); add('cls', e.cls); add('time', stamp(new Date(e.at))); add('minutes', e.minutes || '');
     return p;
   }
   function sendOne(e) {
@@ -315,8 +476,8 @@
   function startPin(mode) {
     pinMode = mode; pinEntry = ''; pinFirst = '';
     const titles = {
-      enter: ['Teacher setup', 'Enter your 4-digit PIN'],
-      create: ['Welcome! Create a teacher PIN', 'Choose 4 digits. You\'ll need it to open setup.'],
+      enter: ['Teacher setup', 'Tap or type your 4-digit PIN'],
+      create: ['Welcome! Create a teacher PIN', 'Tap or type 4 digits. You\'ll need them to open setup.'],
       change: ['Change PIN', 'Choose a new 4-digit PIN']
     };
     $('pin-title').textContent = titles[mode][0];
@@ -367,6 +528,14 @@
     if (pinMode === 'change') openSetup(); else goHome();
   });
   $('btn-gear').addEventListener('click', () => startPin('enter'));
+  // Typing the PIN on a keyboard works too (number row or number pad).
+  document.addEventListener('keydown', (e) => {
+    if (current !== 'pin' || e.ctrlKey || e.altKey || e.metaKey) return;
+    if (/^[0-9]$/.test(e.key)) { e.preventDefault(); pinKey(e.key); }
+    else if (e.key === 'Backspace') { e.preventDefault(); pinKey('Delete'); }
+    else if (e.key === 'Delete') { e.preventDefault(); pinKey('Clear'); }
+    else if (e.key === 'Escape' && !$('btn-pin-cancel').hidden) { $('btn-pin-cancel').click(); }
+  });
 
   // ---------- Setup ----------
   function openSetup() {
@@ -379,17 +548,66 @@
     $('form-msg').textContent = ''; $('test-msg').textContent = ''; $('code-msg').textContent = '';
     $('out-code').hidden = true;
     renderStatusArea();
+    loadHallFields();
+    renderSetupOut();
     show('setup');
   }
-  $('btn-setup-done').addEventListener('click', () => {
+  function loadHallFields() {
+    const h = hall();
+    $('hp-on').checked = h.enabled; $('hp-max').value = String(h.maxOut); $('hp-week').value = h.weekLimit;
+    $('hp-warn').value = h.warnMin; $('hp-alert').value = h.alertMin;
+    $('hp-nostart').value = h.noStart; $('hp-noend').value = h.noEnd;
+    $('hp-names').checked = h.showNames; $('hp-beep').checked = h.beep;
+    $('hp-dests').value = h.dests.join('\n');
+  }
+  function num(id, min, max, fallback) {
+    const v = parseInt($(id).value, 10);
+    return isNaN(v) ? fallback : Math.min(max, Math.max(min, v));
+  }
+  function saveSetupFields() {
     config.room = $('in-room').value.trim();
     config.mode = $('in-mode').value || 'auto';
+    const d = HALL_DEFAULTS;
+    const warn = num('hp-warn', 1, 60, d.warnMin);
+    const dests = $('hp-dests').value.split(/\r?\n/).map((x) => x.trim()).filter(Boolean).slice(0, 12);
+    config.hall = {
+      enabled: $('hp-on').checked,
+      maxOut: num('hp-max', 1, 3, d.maxOut),
+      weekLimit: num('hp-week', 0, 20, d.weekLimit),
+      warnMin: warn,
+      alertMin: Math.max(warn, num('hp-alert', 1, 90, d.alertMin)),
+      noStart: num('hp-nostart', 0, 60, d.noStart),
+      noEnd: num('hp-noend', 0, 60, d.noEnd),
+      showNames: $('hp-names').checked,
+      beep: $('hp-beep').checked,
+      dests: dests.length ? dests : d.dests
+    };
     saveConfig();
+  }
+  function renderSetupOut(timersOnly) {
+    const box = $('setup-out-list');
+    if (timersOnly && box.children.length === out.length && out.length) {
+      out.forEach((o, i) => { const t = box.children[i].querySelector('.t'); if (t) t.textContent = mmss(Date.now() - new Date(o.at)); });
+      return;
+    }
+    box.textContent = '';
+    if (!out.length) { box.appendChild(el('div', 'today-empty', 'Nobody is out.')); return; }
+    out.forEach((o) => {
+      const r = el('div', 'today-row');
+      r.appendChild(el('span', 't', mmss(Date.now() - new Date(o.at))));
+      r.appendChild(el('span', null, o.student + ' · ' + o.dest));
+      const b = el('button', null, 'Mark back'); b.type = 'button';
+      b.addEventListener('click', () => comeBack(o, 'teacher'));
+      r.appendChild(b); box.appendChild(r);
+    });
+  }
+  $('btn-setup-done').addEventListener('click', () => {
+    saveSetupFields();
     pickedClass = null; lastActiveId = null;
     goHome(); flushQueue();
   });
   $('btn-change-pin').addEventListener('click', () => {
-    config.room = $('in-room').value.trim(); saveConfig();
+    saveSetupFields();
     startPin('change');
   });
   $('btn-fullscreen').addEventListener('click', () => {
@@ -411,6 +629,7 @@
     { key: 'type', label: 'Type', words: ['type'] },
     { key: 'reason', label: 'Reason', words: ['reason'] },
     { key: 'cls', label: 'Class / period', words: ['class', 'period'] },
+    { key: 'minutes', label: 'Minutes out', words: ['minute'] },
     { key: 'time', label: 'Kiosk time', words: ['time', 'kiosk'] }
   ];
   let parsed = null;
@@ -609,11 +828,9 @@
   $('btn-test').addEventListener('click', () => {
     const msg = $('test-msg');
     if (!formReady()) { msg.textContent = 'Connect the form first (section 1).'; msg.className = 'msg bad'; return; }
-    config.room = $('in-room').value.trim(); saveConfig();
+    saveSetupFields();
     const now = new Date();
-    const e = { id: uid(), at: now.toISOString(), room: config.room || '', student: 'TEST', cls: '', type: 'Test', reason: 'Setup test', test: true };
-    queue.push(e); saveQueue();
-    log.unshift({ id: e.id, at: e.at, student: 'TEST', type: 'Test', reason: '', sent: false, test: true }); saveLog();
+    const e = record('TEST', 'Test', 'Setup test', '', true);
     msg.textContent = 'Sending…'; msg.className = 'msg';
     flushQueue().then(() => {
       if (queue.some((q) => q.id === e.id)) { msg.textContent = "Couldn't reach Google (no internet?). It will keep trying."; msg.className = 'msg bad'; }
@@ -632,15 +849,16 @@
     rows.forEach((l) => {
       const r = el('div', 'today-row');
       r.appendChild(el('span', null, clockText(new Date(l.at))));
-      r.appendChild(el('span', null, l.student + (l.reason ? ' · ' + l.reason : '')));
+      r.appendChild(el('span', null, l.student + ' · ' + (l.type === 'Tardy' ? 'Late' : l.type) + (l.reason ? ' · ' + l.reason : '') + (l.minutes ? ' · ' + l.minutes + ' min' : '')));
       const waiting = queue.some((q) => q.id === l.id);
       r.appendChild(el('span', waiting ? 'w' : 's', waiting ? 'Waiting' : 'Sent'));
       box.appendChild(r);
     });
   }
   $('btn-clear-today').addEventListener('click', () => {
-    if (!confirm("Clear this device's list? (The Google Sheet is not changed.)")) return;
-    log = log.filter((l) => queue.some((q) => q.id === l.id)); saveLog(); renderStatusArea();
+    if (!confirm("Clear today's list on this device? (The Google Sheet is not changed. Weekly hall pass counts for today are cleared too.)")) return;
+    const t = new Date();
+    log = log.filter((l) => queue.some((q) => q.id === l.id) || !sameDay(new Date(l.at), t)); saveLog(); renderStatusArea();
   });
 
   // --- Setup codes ---
@@ -674,6 +892,7 @@
 
   // --- Erase ---
   $('btn-erase').addEventListener('click', () => {
+    if (out.length && !confirm(out.length + ' student(s) are still out on a hall pass. Continue?')) return;
     if (queue.length && !confirm(queue.length + ' check-in(s) have not been sent yet and will be lost. Continue?')) return;
     if (!confirm('Erase everything on this device?')) return;
     Object.values(K).forEach((k) => localStorage.removeItem(k));

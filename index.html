@@ -35,8 +35,12 @@
   <!-- 1. Tap your name -->
   <section id="screen-names" class="screen" hidden>
     <div class="names-head">
-      <h1>Arriving late? Tap your name.</h1>
+      <h1 id="names-title">Arriving late? Tap your name.</h1>
       <span class="hint">Sorted by first name</span>
+    </div>
+    <div id="out-strip" class="out-strip" hidden>
+      <span class="out-label">Out now · tap your name when you're back:</span>
+      <div id="out-chips" class="out-chips"></div>
     </div>
     <div id="name-grid" class="name-grid"></div>
     <p id="names-empty" class="empty" hidden></p>
@@ -54,8 +58,8 @@
   <!-- 2. Hi, name! -->
   <section id="screen-hello" class="screen center" hidden>
     <h1 id="hello-name" class="hello">Hi!</h1>
-    <div class="reasons">
-      <p class="reason-q">Why are you late? <em>(optional — skip if you want)</em></p>
+    <div id="reasons" class="reasons">
+      <p id="reason-q" class="reason-q">Why are you late? <em>(optional — skip if you want)</em></p>
       <div id="reason-row" class="reason-row">
         <button type="button" class="chip" data-reason="Bus" aria-pressed="false">Bus</button>
         <button type="button" class="chip" data-reason="Office" aria-pressed="false">Office</button>
@@ -63,11 +67,28 @@
         <button type="button" class="chip" data-reason="Other" aria-pressed="false">Other</button>
       </div>
     </div>
-    <button id="btn-late" class="big-btn" type="button">
-      <svg width="54" height="54" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-      I'm late
-    </button>
+    <div id="action-row" class="action-row">
+      <button id="btn-late" class="big-btn" type="button">
+        <svg width="54" height="54" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        I'm late
+      </button>
+      <button id="btn-out" class="big-btn out" type="button" hidden>
+        <svg width="54" height="54" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h5v16h-5"/><path d="M10 16l4-4-4-4"/><path d="M14 12H3"/></svg>
+        Hall pass: going out
+      </button>
+      <button id="btn-backin" class="big-btn back" type="button" hidden>
+        <svg width="54" height="54" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H5v16h5"/><path d="M14 8l-4 4 4 4"/><path d="M10 12h11"/></svg>
+        I'm back
+      </button>
+    </div>
+    <p id="hall-note" class="hall-note" hidden></p>
     <p class="idle-note">Goes back to the name list in 20 seconds if nobody taps.</p>
+  </section>
+
+  <!-- Hall pass: where are you going? -->
+  <section id="screen-dest" class="screen center" hidden>
+    <h1 id="dest-title" class="dest-title">Where are you going?</h1>
+    <div id="dest-grid" class="dest-grid"></div>
   </section>
 
   <!-- Not on the list -->
@@ -99,7 +120,7 @@
   <section id="screen-pin" class="screen pin" hidden>
     <button id="btn-pin-cancel" class="link-btn pin-cancel" type="button">Cancel</button>
     <h1 id="pin-title">Teacher setup</h1>
-    <p id="pin-sub" class="sub">Enter your 4-digit PIN</p>
+    <p id="pin-sub" class="sub">Tap or type your 4-digit PIN</p>
     <div id="pin-dots" class="pin-dots" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
     <p id="pin-msg" class="pin-msg" role="alert"></p>
     <div id="pin-pad" class="pin-pad"></div>
@@ -119,7 +140,7 @@
       <!-- Form -->
       <section class="card">
         <h2>1. Connect your Google Form</h2>
-        <p class="help">In Google Forms, open the ⋮ menu › <b>Get pre-filled link</b>. Type the word <b>room</b> in the Room question, <b>student</b> in Student, <b>type</b> in Type, <b>reason</b> in Reason (and <b>class</b> / <b>time</b> if you added those). Click <b>Get link</b>, copy it, and paste it here.</p>
+        <p class="help">In Google Forms, open the ⋮ menu › <b>Get pre-filled link</b>. Type the word <b>room</b> in the Room question, <b>student</b> in Student, <b>type</b> in Type, <b>reason</b> in Reason <b>class</b> in Class, <b>time</b> in Kiosk time, and <b>minutes</b> in Minutes out. Click <b>Get link</b>, copy it, and paste it here.</p>
         <label class="field">Pre-filled link
           <textarea id="in-prefill" rows="3" spellcheck="false" placeholder="https://docs.google.com/forms/d/e/…/viewform?usp=pp_url&entry.…"></textarea>
         </label>
@@ -205,12 +226,45 @@
         <p id="code-msg" class="msg" role="status"></p>
       </section>
 
+      <!-- Hall passes -->
+      <section class="card">
+        <h2>6. Hall passes</h2>
+        <label class="check-line"><input id="hp-on" type="checkbox"> Turn on hall pass buttons on this kiosk</label>
+        <div class="two">
+          <label class="field">Students out at once
+            <select id="hp-max"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
+          </label>
+          <label class="field">Passes per student per week (0 = no limit)
+            <input id="hp-week" type="number" min="0" max="20" step="1">
+          </label>
+          <label class="field">Timer turns gold after (minutes)
+            <input id="hp-warn" type="number" min="1" max="60" step="1">
+          </label>
+          <label class="field">Timer turns red after (minutes)
+            <input id="hp-alert" type="number" min="1" max="90" step="1">
+          </label>
+          <label class="field">No passes in the first (minutes of class)
+            <input id="hp-nostart" type="number" min="0" max="60" step="1">
+          </label>
+          <label class="field">No passes in the last (minutes of class)
+            <input id="hp-noend" type="number" min="0" max="60" step="1">
+          </label>
+        </div>
+        <label class="check-line"><input id="hp-names" type="checkbox"> Show who is out on the kiosk (first name + last initial)</label>
+        <label class="check-line"><input id="hp-beep" type="checkbox"> Beep once when a timer turns red</label>
+        <label class="field">Places students can go (one per line)
+          <textarea id="hp-dests" rows="6" spellcheck="false"></textarea>
+        </label>
+        <p class="help">If a student doesn't tap "I'm back," the pass closes itself at the end of the class (or after an hour) and the Sheet says "Not signed back in."</p>
+        <h3>Out right now</h3>
+        <div id="setup-out-list" class="today-list"></div>
+      </section>
+
       <!-- Reset -->
       <section class="card">
-        <h2>6. Erase this device</h2>
-        <p class="help">Removes the form connection, room, PIN, class lists and any check-ins still waiting to send. Use this before giving the device to someone else.</p>
+        <h2>7. Erase this device</h2>
+        <p class="help">Removes the form connection, room, PIN, class lists, hall pass settings and any check-ins still waiting to send. Use this before giving the device to someone else.</p>
         <div class="row"><button id="btn-erase" class="danger-btn" type="button">Erase everything on this device</button></div>
-        <p class="help small">Hall pass buttons: coming later.</p>
       </section>
     </div>
   </section>
