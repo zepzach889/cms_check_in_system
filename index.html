@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Tardy Sign-In</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%231D5C3A'/%3E%3Cpath d='M12 6v6l4 2' stroke='%23F3C432' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Lexend:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Shared top bar for student screens -->
+<header id="topbar" class="topbar" hidden>
+  <div class="topbar-left">
+    <div id="where" class="where"><strong id="where-room">Room</strong> <span id="where-class"></span></div>
+    <button id="btn-back" class="pill-btn" type="button" hidden>
+      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      <span id="btn-back-label">That's not me</span>
+    </button>
+  </div>
+  <div class="topbar-right">
+    <span id="status" class="status" role="status" aria-live="polite"><span class="dot"></span><span id="status-text">Starting…</span></span>
+    <span id="clock" class="clock">--:--</span>
+    <button id="btn-gear" class="gear" type="button" aria-label="Teacher setup">
+      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <!-- 1. Tap your name -->
+  <section id="screen-names" class="screen" hidden>
+    <div class="names-head">
+      <h1>Arriving late? Tap your name.</h1>
+      <span class="hint">Sorted by first name</span>
+    </div>
+    <div id="name-grid" class="name-grid"></div>
+    <p id="names-empty" class="empty" hidden></p>
+    <div class="names-foot">
+      <button id="btn-notlisted" class="dashed-btn" type="button">Not on the list?</button>
+    </div>
+  </section>
+
+  <!-- 1b. Choose your class (only when the bell schedule can't tell) -->
+  <section id="screen-pickclass" class="screen center" hidden>
+    <h1>Which class are you late to?</h1>
+    <div id="class-grid" class="class-grid"></div>
+  </section>
+
+  <!-- 2. Hi, name! -->
+  <section id="screen-hello" class="screen center" hidden>
+    <h1 id="hello-name" class="hello">Hi!</h1>
+    <div class="reasons">
+      <p class="reason-q">Why are you late? <em>(optional — skip if you want)</em></p>
+      <div id="reason-row" class="reason-row">
+        <button type="button" class="chip" data-reason="Bus" aria-pressed="false">Bus</button>
+        <button type="button" class="chip" data-reason="Office" aria-pressed="false">Office</button>
+        <button type="button" class="chip" data-reason="Another teacher" aria-pressed="false">Another teacher</button>
+        <button type="button" class="chip" data-reason="Other" aria-pressed="false">Other</button>
+      </div>
+    </div>
+    <button id="btn-late" class="big-btn" type="button">
+      <svg width="54" height="54" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      I'm late
+    </button>
+    <p class="idle-note">Goes back to the name list in 20 seconds if nobody taps.</p>
+  </section>
+
+  <!-- Not on the list -->
+  <section id="screen-notlisted" class="screen center" hidden>
+    <h1>Type your name</h1>
+    <p class="sub">New to this class, or visiting? That's okay. Your teacher will see it.</p>
+    <form id="form-notlisted" class="typed-name" autocomplete="off">
+      <label>First name <input id="nl-first" type="text" maxlength="40" required></label>
+      <label>Last name <input id="nl-last" type="text" maxlength="40" required></label>
+      <button class="big-btn small" type="submit">I'm late</button>
+    </form>
+  </section>
+
+  <!-- 3. Done -->
+  <section id="screen-done" class="screen done" hidden>
+    <div class="check" aria-hidden="true">
+      <svg width="88" height="88" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+    </div>
+    <h1 id="done-title">You're checked in.</h1>
+    <p id="done-seat" class="seat">Have a seat.</p>
+    <p id="done-detail" class="detail"></p>
+    <div class="done-foot">
+      <button id="btn-done-now" class="link-btn" type="button">Back to names now</button>
+      <div class="bar"><div id="done-bar"></div></div>
+    </div>
+  </section>
+
+  <!-- Teacher PIN -->
+  <section id="screen-pin" class="screen pin" hidden>
+    <button id="btn-pin-cancel" class="link-btn pin-cancel" type="button">Cancel</button>
+    <h1 id="pin-title">Teacher setup</h1>
+    <p id="pin-sub" class="sub">Enter your 4-digit PIN</p>
+    <div id="pin-dots" class="pin-dots" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+    <p id="pin-msg" class="pin-msg" role="alert"></p>
+    <div id="pin-pad" class="pin-pad"></div>
+  </section>
+
+  <!-- Teacher setup -->
+  <section id="screen-setup" class="screen setup" hidden>
+    <div class="setup-bar">
+      <h1>Teacher setup on this device</h1>
+      <div class="setup-bar-actions">
+        <button id="btn-fullscreen" class="ghost-btn" type="button">Full screen</button>
+        <button id="btn-setup-done" class="light-btn" type="button">Save &amp; back to kiosk</button>
+      </div>
+    </div>
+
+    <div class="setup-grid">
+      <!-- Form -->
+      <section class="card">
+        <h2>1. Connect your Google Form</h2>
+        <p class="help">In Google Forms, open the ⋮ menu › <b>Get pre-filled link</b>. Type the word <b>room</b> in the Room question, <b>student</b> in Student, <b>type</b> in Type, <b>reason</b> in Reason (and <b>class</b> / <b>time</b> if you added those). Click <b>Get link</b>, copy it, and paste it here.</p>
+        <label class="field">Pre-filled link
+          <textarea id="in-prefill" rows="3" spellcheck="false" placeholder="https://docs.google.com/forms/d/e/…/viewform?usp=pp_url&entry.…"></textarea>
+        </label>
+        <div class="row"><button id="btn-read-link" class="primary-btn" type="button">Read link</button></div>
+        <p id="form-msg" class="msg" role="status"></p>
+        <div id="map-box" hidden>
+          <p class="help">Check that each answer box is matched to the right question:</p>
+          <div id="map-rows" class="map-rows"></div>
+          <div class="row"><button id="btn-save-map" class="primary-btn" type="button">Save form connection</button></div>
+        </div>
+        <p id="form-current" class="ok-line" hidden></p>
+      </section>
+
+      <!-- Room -->
+      <section class="card">
+        <h2>2. This room</h2>
+        <label class="field">Room name (sent with every check-in — type it the same way every time)
+          <input id="in-room" type="text" maxlength="40" placeholder="Room 14">
+        </label>
+        <label class="field">Which class shows on the kiosk
+          <select id="in-mode"></select>
+        </label>
+        <div class="field">Teacher PIN
+          <div class="row"><button id="btn-change-pin" class="ghost-dark-btn" type="button">Change PIN</button></div>
+        </div>
+      </section>
+
+      <!-- Classes -->
+      <section class="card">
+        <h2>3. Class lists</h2>
+        <p class="help">Names are saved only in this browser — never on the website. Paste names one per line (“Maya Rivera” or “Rivera, Maya”), or upload a CSV file with First and Last name columns.</p>
+        <div id="class-list" class="class-list"></div>
+        <div class="row"><button id="btn-add-class" class="primary-btn" type="button">Add a class</button></div>
+
+        <form id="class-editor" class="class-editor" hidden>
+          <h3 id="ce-title">Add a class</h3>
+          <label class="field">Class name <input id="ce-name" type="text" maxlength="40" placeholder="Period 3 – World History" required></label>
+          <div class="two">
+            <label class="field">Starts <input id="ce-start" type="time" required></label>
+            <label class="field">Ends <input id="ce-end" type="time" required></label>
+          </div>
+          <label class="field">Students
+            <textarea id="ce-names" rows="7" spellcheck="false" placeholder="Maya Rivera&#10;Jordan Tran&#10;…"></textarea>
+          </label>
+          <div class="row">
+            <label class="file-btn">Upload a file<input id="ce-file" type="file" accept=".csv,.txt,text/csv,text/plain"></label>
+            <span id="ce-count" class="help"></span>
+          </div>
+          <div class="row">
+            <button class="primary-btn" type="submit">Save class</button>
+            <button id="ce-cancel" class="ghost-dark-btn" type="button">Cancel</button>
+            <button id="ce-delete" class="danger-btn" type="button" hidden>Delete class</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Test & status -->
+      <section class="card">
+        <h2>4. Test &amp; send status</h2>
+        <div class="row">
+          <button id="btn-test" class="primary-btn" type="button">Send a test entry</button>
+          <button id="btn-send-now" class="ghost-dark-btn" type="button">Send waiting now</button>
+        </div>
+        <p id="test-msg" class="msg" role="status"></p>
+        <div class="stat-line"><span>Waiting to send</span><strong id="queue-count">0 check-ins</strong></div>
+        <p class="help">Google doesn't reply when a check-in arrives, so the kiosk keeps a copy and retries if the internet drops. After a test, always look in your Sheet. The Sheet is the real record.</p>
+        <h3>Today on this device</h3>
+        <div id="today-list" class="today-list"></div>
+        <div class="row"><button id="btn-clear-today" class="ghost-dark-btn" type="button">Clear this list</button></div>
+      </section>
+
+      <!-- Copy setup -->
+      <section class="card">
+        <h2>5. Copy setup to another device</h2>
+        <p class="help">Makes a code with the form connection (and, if you want, the bell schedule). Paste it into another kiosk's setup. It never includes student names, the room name, or the PIN.</p>
+        <label class="check-line"><input id="in-include-bell" type="checkbox" checked> Include class names and times (no students)</label>
+        <div class="row"><button id="btn-make-code" class="primary-btn" type="button">Make setup code</button></div>
+        <textarea id="out-code" rows="3" readonly spellcheck="false" hidden></textarea>
+        <label class="field">Paste a setup code from another device
+          <textarea id="in-code" rows="2" spellcheck="false"></textarea>
+        </label>
+        <div class="row"><button id="btn-use-code" class="ghost-dark-btn" type="button">Use this code</button></div>
+        <p id="code-msg" class="msg" role="status"></p>
+      </section>
+
+      <!-- Reset -->
+      <section class="card">
+        <h2>6. Erase this device</h2>
+        <p class="help">Removes the form connection, room, PIN, class lists and any check-ins still waiting to send. Use this before giving the device to someone else.</p>
+        <div class="row"><button id="btn-erase" class="danger-btn" type="button">Erase everything on this device</button></div>
+        <p class="help small">Hall pass buttons: coming later.</p>
+      </section>
+    </div>
+  </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
