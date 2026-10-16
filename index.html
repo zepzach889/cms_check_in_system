@@ -163,6 +163,10 @@
         <label class="field">Which class shows on the kiosk
           <select id="in-mode"></select>
         </label>
+        <label class="field">Today's bell schedule
+          <select id="in-today"></select>
+        </label>
+        <p class="help">Comes from the school's bell schedule automatically. Change it here only for a surprise schedule; it goes back to normal tomorrow.</p>
         <div class="field">Teacher PIN
           <div class="row"><button id="btn-change-pin" class="ghost-dark-btn" type="button">Change PIN</button></div>
         </div>
@@ -171,17 +175,22 @@
       <!-- Classes -->
       <section class="card">
         <h2>3. Class lists</h2>
-        <p class="help">Names are saved only in this browser — never on the website. Paste names one per line (“Maya Rivera” or “Rivera, Maya”), or upload a CSV file with First and Last name columns.</p>
+        <p class="help">Pick the period and the times come from the school bell schedule. Names are saved only in this browser — never on the website. Paste names one per line (“Maya Rivera” or “Rivera, Maya”), or upload a CSV file with First and Last name columns.</p>
         <div id="class-list" class="class-list"></div>
         <div class="row"><button id="btn-add-class" class="primary-btn" type="button">Add a class</button></div>
 
         <form id="class-editor" class="class-editor" hidden>
           <h3 id="ce-title">Add a class</h3>
-          <label class="field">Class name <input id="ce-name" type="text" maxlength="40" placeholder="Period 3 – World History" required></label>
           <div class="two">
-            <label class="field">Starts <input id="ce-start" type="time" required></label>
-            <label class="field">Ends <input id="ce-end" type="time" required></label>
+            <label class="field">Period <select id="ce-period"></select></label>
+            <label id="ce-grade-wrap" class="field">Grade (this period's times depend on it) <select id="ce-grade"></select></label>
           </div>
+          <div id="ce-custom" class="two" hidden>
+            <label class="field">Starts <input id="ce-start" type="time"></label>
+            <label class="field">Ends <input id="ce-end" type="time"></label>
+          </div>
+          <p id="ce-times" class="help"></p>
+          <label class="field">Class name (optional) <input id="ce-name" type="text" maxlength="40" placeholder="World History 6"></label>
           <label class="field">Students
             <textarea id="ce-names" rows="7" spellcheck="false" placeholder="Maya Rivera&#10;Jordan Tran&#10;…"></textarea>
           </label>
@@ -215,8 +224,8 @@
       <!-- Copy setup -->
       <section class="card">
         <h2>5. Copy setup to another device</h2>
-        <p class="help">Makes a code with the form connection (and, if you want, the bell schedule). Paste it into another kiosk's setup. It never includes student names, the room name, or the PIN.</p>
-        <label class="check-line"><input id="in-include-bell" type="checkbox" checked> Include class names and times (no students)</label>
+        <p class="help">Makes a code with the form connection (and, if you want, your class periods and names). Paste it into another kiosk's setup. It never includes student names, the room name, or the PIN.</p>
+        <label class="check-line"><input id="in-include-bell" type="checkbox" checked> Include class periods and names (no students)</label>
         <div class="row"><button id="btn-make-code" class="primary-btn" type="button">Make setup code</button></div>
         <textarea id="out-code" rows="3" readonly spellcheck="false" hidden></textarea>
         <label class="field">Paste a setup code from another device
@@ -270,6 +279,7 @@
   </section>
 </main>
 
+<script src="schedule.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -12,6 +12,7 @@ Synergy stays the official attendance record. This is a convenience log.
 |---|---|
 | `index.html` | The kiosk page |
 | `style.css` | Colors and layout (school green, gold, and white) |
+| `schedule.js` | The school's bell schedule (Regular Day and Wednesday Early Release). Edit this to change times for every kiosk |
 | `app.js` | How the kiosk works |
 | `sw.js` | Lets the page open even if the internet is down when the device restarts |
 | `sample-class-list.csv` | A made-up class list you can use to practice importing |
@@ -83,8 +84,9 @@ That address is your kiosk. Bookmark it.
 3. In **Teacher setup**:
    - **1. Connect your Google Form:** paste the pre-filled link and click **Read link**. Each answer box is listed with a guess at which question it belongs to. Check the guesses, then click **Save form connection**.
    - **2. This room:** type the room name, like `Room 14`. **Type it exactly the same way every time.** The office and teacher reports sort by this name.
-   - **3. Class lists:** click **Add a class**, then enter the class name, start time, and end time, and paste the student names (one per line). "Maya Rivera" and "Rivera, Maya" both work. You can also upload a CSV with First and Last name columns, like `sample-class-list.csv`. Repeat for each class, including Advisory and electives.
-   - **Which class shows on the kiosk:** "Switch automatically by bell schedule" shows the class that's in session (starting 5 minutes before the bell). Between classes, students see a "Which class are you late to?" screen. You can also choose to always show one class.
+   - **3. Class lists:** click **Add a class**, pick the **Period**, and for Period 4 pick the **grade** (6th grade and 7th/8th grade have different Period 4 times). The class name is optional; it says "Period 3" if you leave it blank. Paste the student names (one per line). "Maya Rivera" and "Rivera, Maya" both work, or upload a CSV with First and Last name columns, like `sample-class-list.csv`. Repeat for each class, including Advisory and electives.
+     The times come from the school bell schedule, so you never type them. The editor shows the period's times on each schedule so you can check them. For an unusual class that doesn't follow the bells, choose **Custom times** at the bottom of the Period list.
+   - **Which class shows on the kiosk:** "Switch automatically by bell schedule" shows the class that's in session (or starting within 5 minutes). Between classes, during lunch, or during a prep period, students see a "Which class are you late to?" screen. You can also choose to always show one class.
 4. Click **Save & back to kiosk**.
 
 To get back into setup, tap or click the small **gear** in the top corner and enter your PIN. Setup locks itself after 5 idle minutes.
@@ -128,12 +130,39 @@ A handy check: open the form's normal link in an **Incognito window** (Ctrl+Shif
 
 ---
 
+## The bell schedule
+
+The school's bell times live in **`schedule.js`**, and every kiosk reads them from the website. It already has your two schedules:
+
+- **Regular Day:** Monday, Tuesday, Thursday, Friday
+- **Early Release:** Wednesday. Period 5 comes before Period 4 that day, and the kiosk handles that.
+- **Period 4 and lunch** are different for 6th grade and 7th/8th grade, which is why Period 4 classes ask for the grade.
+
+**Changing times for every kiosk:** on GitHub, open `schedule.js`, click the **pencil icon** (Edit), change the times, and click **Commit changes**. Times can be written like `8:20 AM`. Each kiosk uses the new times the next time it loads (restart the browser or refresh the page to make it immediate).
+
+**Special days you know ahead of time** (early release on a different day, no school, a new assembly schedule): in `schedule.js`, add the date under `specialDays`, for example:
+
+```
+specialDays: {
+  "2026-11-25": "early",
+  "2026-12-18": "none"
+}
+```
+
+To add a new schedule, like an assembly day, copy the `early: { ... }` block, rename it (for example `assembly`), and change its times. The comments in the file explain each step.
+
+**A surprise schedule change today:** in a kiosk's setup, section 2, set **Today's bell schedule** to the one you need. It only affects that device, and it goes back to automatic tomorrow.
+
+On days that aren't the normal weekday schedule, the top bar shows the schedule's name (for example "· Early Release").
+
+---
+
 ## How "Minutes late" is figured
 
-When a student taps **I'm late**, the kiosk counts the whole minutes since that class's **start time** in setup. A student who taps at 9:21:40 for a class starting at 9:15 is **6** minutes late. The green screen shows it too ("6 minutes late · Bus").
+When a student taps **I'm late**, the kiosk counts the whole minutes since that class's **start time** on today's bell schedule. A student who taps at 9:21:40 for a class starting at 9:15 is **6** minutes late. The green screen shows it too ("6 minutes late · Bus").
 
-- It's only as accurate as the bell times in setup (section 3), so double-check them.
-- If the kiosk doesn't know which class is in session right now, Minutes late is left blank rather than guessed. That happens with a class that has no times, or "Always show" used outside that class's hours.
+- It's only as accurate as the times in `schedule.js` (or a class's custom times), so double-check them.
+- If the kiosk doesn't know which class is in session right now, Minutes late is left blank rather than guessed. That happens with a class that doesn't meet on today's schedule, or "Always show" used outside that class's hours.
 - Tapping during the 5 minutes before the bell, or within the first minute, counts as 0.
 - Check-ins that wait for the internet keep the minutes figured when the student tapped.
 

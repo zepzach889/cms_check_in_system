@@ -41,6 +41,24 @@
   };
   const hall = () => Object.assign({}, HALL_DEFAULTS, config.hall || {});
   const saveConfig = () => save(K.config, config);
+  // Classes made before the built-in bell schedule: match them to a period if their times fit.
+  (function migrate() {
+    let changed = false;
+    const bell = window.BELL_SCHEDULE || {};
+    const sch = bell.schedules || {};
+    const toHHMM = (t) => { const m = String(t || '').trim().match(/^(\d{1,2}):(\d{2})\s*([ap])?/i); if (!m) return ''; let h = +m[1]; const ap = (m[3] || '').toLowerCase(); if (ap === 'p' && h < 12) h += 12; if (ap === 'a' && h === 12) h = 0; return String(h).padStart(2, '0') + ':' + m[2]; };
+    classes.forEach((c) => {
+      if (c.period || c.custom) return;
+      let found = null;
+      Object.keys(sch).forEach((k) => (sch[k].periods || []).forEach((p) => {
+        if (!found && toHHMM(p.start) === c.start && toHHMM(p.end) === c.end) found = p;
+      }));
+      if (found) { c.period = String(found.period); c.grade = found.grade ? String(found.grade) : ''; }
+      else c.custom = true;
+      changed = true;
+    });
+    if (changed) save(K.classes, classes);
+  })();
   const saveClasses = () => save(K.classes, classes);
   const saveQueue = () => save(K.queue, queue);
   const saveLog = () => save(K.log, log);
@@ -63,6 +81,65 @@
   function fmtMin(m) { const h = Math.floor(m / 60); return ((h % 12) || 12) + ':' + pad(m % 60); }
   function fmt12(t) { return t ? fmtMin(toMin(t)) : ''; }
   function mmss(ms) { const s = Math.max(0, Math.floor(ms / 1000)); return Math.floor(s / 60) + ':' + pad(s % 60); }
+  // ---------- Bell schedule (from schedule.js) ----------
+  const BELL = window.BELL_SCHEDULE || { schedules: {}, weekdays: {}, specialDays: {} };
+  const SCHEDS = BELL.schedules || {};
+  const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const GRADE_LABEL = { '6': '6th grade', '7-8': '7th/8th grade' };
+  const gradeLabel = (g) => GRADE_LABEL[g] || (g + ' grade');
+  function parseTime(t) { // "8:20 AM", "1:41 p.m.", "13:41" -> "13:41"
+    const m = String(t || '').trim().match(/^(\d{1,2}):(\d{2})\s*([ap])?\.?\s*m?\.?$/i);
+    if (!m) return '';
+    let h = +m[1]; const ap = (m[3] || '').toLowerCase();
+    if (ap === 'p' && h < 12) h += 12;
+    if (ap === 'a' && h === 12) h = 0;
+    return pad(h) + ':' + m[2];
+  }
+  function dateKey(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function autoScheduleKey(d) {
+    const special = (BELL.specialDays || {})[dateKey(d)];
+    if (special) return special;
+    return (BELL.weekdays || {})[DAYS[d.getDay()]] || 'none';
+  }
+  function todayScheduleKey() {
+    const d = new Date();
+    if (config.todaySchedule && config.todaySchedule.date === dateKey(d)) return config.todaySchedule.key;
+    return autoScheduleKey(d);
+  }
+  function scheduleName(key) {
+    if (key === 'none') return 'No school';
+    return SCHEDS[key] ? (SCHEDS[key].name || key) : key;
+  }
+  function allPeriods() {
+    const seen = [];
+    Object.keys(SCHEDS).forEach((k) => (SCHEDS[k].periods || []).forEach((p) => { const id = String(p.period); if (seen.indexOf(id) === -1) seen.push(id); }));
+    return seen.sort((a, b) => (parseFloat(a) - parseFloat(b)) || a.localeCompare(b));
+  }
+  function gradesFor(period) {
+    const g = [];
+    Object.keys(SCHEDS).forEach((k) => (SCHEDS[k].periods || []).forEach((p) => {
+      if (String(p.period) === String(period) && p.grade && g.indexOf(String(p.grade)) === -1) g.push(String(p.grade));
+    }));
+    return g;
+  }
+  function periodRow(schedKey, period, grade) {
+    const sc = SCHEDS[schedKey]; if (!sc) return null;
+    return (sc.periods || []).find((p) => String(p.period) === String(period) && (!p.grade || String(p.grade) === String(grade))) || null;
+  }
+  // Today's start/end for a class, or null if it doesn't meet today.
+  function classTimes(c) {
+    if (!c) return null;
+    if (c.custom || !c.period) return (c.start && c.end) ? { start: c.start, end: c.end } : null;
+    const row = periodRow(todayScheduleKey(), c.period, c.grade);
+    if (!row) return null;
+    const st = parseTime(row.start), en = parseTime(row.end);
+    return st && en ? { start: st, end: en } : null;
+  }
+  function classLabel(c) {
+    if (c.custom || !c.period) return 'Custom times';
+    return 'Period ' + c.period + (c.grade ? ' (' + gradeLabel(c.grade) + ')' : '');
+  }
+
   function weekStart() { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; }
 
   // ---------- Screens & idle timers ----------
@@ -97,8 +174,11 @@
     if (!classes.length) return null;
     if (config.mode && config.mode !== 'auto') return classes.find((c) => c.id === config.mode) || null;
     const m = nowMin();
-    const inSession = classes.find((c) => c.start && c.end && m >= toMin(c.start) - 5 && m <= toMin(c.end));
-    if (inSession) return inSession;
+    const today = classes.map((c) => ({ c, t: classTimes(c) })).filter((x) => x.t);
+    // A class in session wins; otherwise one starting within 5 minutes.
+    const hit = today.find((x) => m >= toMin(x.t.start) && m <= toMin(x.t.end)) ||
+      today.find((x) => m >= toMin(x.t.start) - 5 && m < toMin(x.t.start));
+    if (hit) return hit.c;
     if (pickedClass && Date.now() < pickedClass.until) return classes.find((c) => c.id === pickedClass.id) || null;
     return null;
   }
@@ -113,7 +193,10 @@
 
   function updateWhere(cls) {
     $('where-room').textContent = config.room || 'Room not set';
-    $('where-class').textContent = cls ? cls.name : '';
+    const key = todayScheduleKey();
+    const firstKey = Object.keys(SCHEDS)[0];
+    const extra = key !== firstKey ? ' · ' + scheduleName(key) : '';
+    $('where-class').textContent = (cls ? cls.name : '') + extra;
   }
 
   // ---------- Names ----------
@@ -156,13 +239,18 @@
     });
   }
 
+  function sortedClasses() {
+    const key = (c) => { const t = classTimes(c); return t ? toMin(t.start) : 2000 + (parseFloat(c.period) || 0); };
+    return classes.slice().sort((a, b) => key(a) - key(b));
+  }
   function renderClassPicker() {
     const grid = $('class-grid');
     grid.textContent = '';
-    classes.slice().sort((a, b) => toMin(a.start) - toMin(b.start)).forEach((c) => {
+    sortedClasses().forEach((c) => {
       const b = el('button', 'class-btn', c.name);
       b.type = 'button';
-      if (c.start && c.end) b.appendChild(el('small', null, fmt12(c.start) + '–' + fmt12(c.end)));
+      const t = classTimes(c);
+      b.appendChild(el('small', null, t ? fmt12(t.start) + '–' + fmt12(t.end) : classLabel(c)));
       b.addEventListener('click', () => {
         pickedClass = { id: c.id, until: Date.now() + 60 * 60000 };
         renderNames(c); show('names');
@@ -251,10 +339,10 @@
   // Minutes after the class's start time. Blank if the kiosk doesn't know a class
   // that is in session right now (so "Always show" outside class time can't give odd numbers).
   function minutesLate(now) {
-    const c = showingClass;
-    if (!c || !c.start || !c.end) return '';
-    const st = new Date(now); st.setHours(0, 0, 0, 0); st.setMinutes(toMin(c.start));
-    const en = new Date(now); en.setHours(0, 0, 0, 0); en.setMinutes(toMin(c.end));
+    const t = classTimes(showingClass);
+    if (!t) return '';
+    const st = new Date(now); st.setHours(0, 0, 0, 0); st.setMinutes(toMin(t.start));
+    const en = new Date(now); en.setHours(0, 0, 0, 0); en.setMinutes(toMin(t.end));
     if (now < st.getTime() - 5 * 60000 || now >= en.getTime() + 60000) return '';
     return String(Math.max(0, Math.floor((now - st) / 60000)));
   }
@@ -285,9 +373,9 @@
       const who = out.map((o) => o.label);
       return 'Wait until ' + who.join(' and ') + (who.length > 1 ? ' are' : ' is') + ' back.';
     }
-    const c = showingClass;
-    if (c && c.start && c.end) {
-      const st = toMin(c.start), en = toMin(c.end);
+    const t = classTimes(showingClass);
+    if (t) {
+      const st = toMin(t.start), en = toMin(t.end);
       if (h.noStart > 0 && now >= st - 5 && now < st + h.noStart) return 'Hall passes start at ' + fmtMin(st + h.noStart) + '.';
       if (h.noEnd > 0 && now >= en - h.noEnd && now <= en) return 'No hall passes in the last ' + h.noEnd + ' minutes of class.';
     }
@@ -316,8 +404,9 @@
     if (why) { openHello(pending.full, pending.first, false, pending.label); return; }
     const now = new Date();
     let until = now.getTime() + 60 * 60000;
-    if (showingClass && showingClass.end) {
-      const e = new Date(now); e.setHours(0, 0, 0, 0); e.setMinutes(toMin(showingClass.end));
+    const ct = classTimes(showingClass);
+    if (ct) {
+      const e = new Date(now); e.setHours(0, 0, 0, 0); e.setMinutes(toMin(ct.end) + 1);
       if (e > now) until = Math.min(until, e.getTime());
     }
     record(pending.full, 'Hall pass out', dest, '');
@@ -558,6 +647,7 @@
   function openSetup() {
     $('in-room').value = config.room || '';
     renderModeSelect();
+    renderTodaySelect();
     renderFormCurrent();
     renderClassList();
     $('class-editor').hidden = true;
@@ -584,6 +674,8 @@
   function saveSetupFields() {
     config.room = $('in-room').value.trim();
     config.mode = $('in-mode').value || 'auto';
+    const tv = $('in-today').value;
+    config.todaySchedule = (tv && tv !== 'auto') ? { date: dateKey(new Date()), key: tv } : null;
     const d = HALL_DEFAULTS;
     const warn = num('hp-warn', 1, 60, d.warnMin);
     const dests = $('hp-dests').value.split(/\r?\n/).map((x) => x.trim()).filter(Boolean).slice(0, 12);
@@ -632,6 +724,14 @@
     if (document.fullscreenElement) document.exitFullscreen(); else if (d.requestFullscreen) d.requestFullscreen().catch(() => {});
   });
 
+  function renderTodaySelect() {
+    const s = $('in-today'); s.textContent = '';
+    const auto = autoScheduleKey(new Date());
+    const o = el('option', null, 'Automatic — ' + scheduleName(auto)); o.value = 'auto'; s.appendChild(o);
+    Object.keys(SCHEDS).concat(['none']).forEach((k) => { const x = el('option', null, scheduleName(k) + ' (today only)'); x.value = k; s.appendChild(x); });
+    const ts = config.todaySchedule;
+    s.value = ts && ts.date === dateKey(new Date()) ? ts.key : 'auto';
+  }
   function renderModeSelect() {
     const s = $('in-mode'); s.textContent = '';
     const o = el('option', null, 'Switch automatically by bell schedule'); o.value = 'auto'; s.appendChild(o);
@@ -733,11 +833,14 @@
   function renderClassList() {
     const list = $('class-list'); list.textContent = '';
     if (!classes.length) { list.appendChild(el('p', 'help', 'No classes yet.')); }
-    classes.slice().sort((a, b) => toMin(a.start) - toMin(b.start)).forEach((c) => {
+    sortedClasses().forEach((c) => {
       const row = el('div', 'class-item');
       const t = el('span');
       const b = el('strong', null, c.name); t.appendChild(b);
-      t.appendChild(document.createTextNode(' · ' + fmt12(c.start) + '–' + fmt12(c.end) + ' · ' + (c.students || []).length + ' students'));
+      const tt = classTimes(c);
+      const when = tt ? 'today ' + fmt12(tt.start) + '–' + fmt12(tt.end) : 'not on today\'s schedule';
+      const label = classLabel(c);
+      t.appendChild(document.createTextNode(' · ' + (label === c.name ? '' : label + ' · ') + when + ' · ' + (c.students || []).length + ((c.students || []).length === 1 ? ' student' : ' students')));
       const edit = el('button', null, 'Edit'); edit.type = 'button';
       edit.addEventListener('click', () => openEditor(c));
       row.appendChild(t); row.appendChild(edit); list.appendChild(row);
@@ -747,8 +850,13 @@
     editingId = c ? c.id : null;
     $('ce-title').textContent = c ? 'Edit ' + c.name : 'Add a class';
     $('ce-name').value = c ? c.name : '';
-    $('ce-start').value = c ? c.start : '';
-    $('ce-end').value = c ? c.end : '';
+    const ps = $('ce-period'); ps.textContent = '';
+    allPeriods().forEach((p) => { const o = el('option', null, 'Period ' + p); o.value = p; ps.appendChild(o); });
+    const oc = el('option', null, 'Custom times'); oc.value = 'custom'; ps.appendChild(oc);
+    ps.value = c ? (c.custom || !c.period ? 'custom' : c.period) : (allPeriods()[0] || 'custom');
+    $('ce-start').value = c && c.start ? c.start : '';
+    $('ce-end').value = c && c.end ? c.end : '';
+    editorPeriodChanged(c ? c.grade : '');
     $('ce-names').value = c ? (c.students || []).map((s) => (s.first + ' ' + s.last).trim()).join('\n') : '';
     $('ce-delete').hidden = !c;
     $('ce-file').value = '';
@@ -757,6 +865,29 @@
     $('ce-name').focus();
   }
   $('btn-add-class').addEventListener('click', () => openEditor(null));
+  function editorPeriodChanged(keepGrade) {
+    const p = $('ce-period').value;
+    const custom = p === 'custom';
+    $('ce-custom').hidden = !custom;
+    const grades = custom ? [] : gradesFor(p);
+    const gs = $('ce-grade'); gs.textContent = '';
+    grades.forEach((g) => { const o = el('option', null, gradeLabel(g)); o.value = g; gs.appendChild(o); });
+    $('ce-grade-wrap').hidden = !grades.length;
+    if (grades.length) gs.value = grades.indexOf(keepGrade) !== -1 ? keepGrade : grades[0];
+    editorTimesNote();
+  }
+  function editorTimesNote() {
+    const p = $('ce-period').value, note = $('ce-times');
+    if (p === 'custom') { note.textContent = 'These times are used every day, whatever the bell schedule.'; return; }
+    const g = $('ce-grade-wrap').hidden ? '' : $('ce-grade').value;
+    const parts = Object.keys(SCHEDS).map((k) => {
+      const r = periodRow(k, p, g);
+      return scheduleName(k) + ': ' + (r ? fmt12(parseTime(r.start)) + '–' + fmt12(parseTime(r.end)) : 'no class');
+    });
+    note.textContent = parts.join(' · ');
+  }
+  $('ce-period').addEventListener('change', () => editorPeriodChanged($('ce-grade').value));
+  $('ce-grade').addEventListener('change', editorTimesNote);
   $('ce-cancel').addEventListener('click', () => { $('class-editor').hidden = true; });
   $('ce-delete').addEventListener('click', () => {
     if (!editingId) return;
@@ -784,14 +915,19 @@
   });
   $('class-editor').addEventListener('submit', (e) => {
     e.preventDefault();
-    const name = $('ce-name').value.trim(), start = $('ce-start').value, end = $('ce-end').value;
-    if (!name || !start || !end) return;
-    if (toMin(end) <= toMin(start)) { alert('The end time needs to be after the start time.'); return; }
+    const p = $('ce-period').value, custom = p === 'custom';
+    const start = $('ce-start').value, end = $('ce-end').value;
+    const grade = custom || $('ce-grade-wrap').hidden ? '' : $('ce-grade').value;
+    if (custom) {
+      if (!start || !end) { alert('Enter a start and end time, or pick a period.'); return; }
+      if (toMin(end) <= toMin(start)) { alert('The end time needs to be after the start time.'); return; }
+    }
+    const name = $('ce-name').value.trim() || (custom ? 'Class ' + fmt12(start) : 'Period ' + p + (grade ? ' (' + gradeLabel(grade) + ')' : ''));
     const students = parseNames($('ce-names').value);
     if (editingId) {
       const c = classes.find((x) => x.id === editingId);
-      Object.assign(c, { name, start, end, students });
-    } else classes.push({ id: uid(), name, start, end, students });
+      Object.assign(c, { name, period: custom ? '' : p, grade, custom, start: custom ? start : '', end: custom ? end : '', students });
+    } else classes.push({ id: uid(), name, period: custom ? '' : p, grade, custom, start: custom ? start : '', end: custom ? end : '', students });
     saveClasses();
     $('class-editor').hidden = true; renderClassList(); renderModeSelect();
   });
@@ -885,7 +1021,7 @@
   $('btn-make-code').addEventListener('click', () => {
     if (!formReady()) { const m = $('code-msg'); m.textContent = 'Connect the form first.'; m.className = 'msg bad'; return; }
     const data = { v: 1, formId: config.formId, map: config.map };
-    if ($('in-include-bell').checked) data.bell = classes.map((c) => ({ name: c.name, start: c.start, end: c.end }));
+    if ($('in-include-bell').checked) data.bell = classes.map((c) => ({ name: c.name, period: c.period || '', grade: c.grade || '', custom: !!c.custom, start: c.start || '', end: c.end || '' }));
     const out = $('out-code'); out.value = enc(data); out.hidden = false; out.select();
     try { navigator.clipboard.writeText(out.value); $('code-msg').textContent = 'Code copied. Paste it into the other device\'s setup.'; $('code-msg').className = 'msg ok'; } catch (e) { /* select is enough */ }
   });
@@ -899,7 +1035,7 @@
     (data.bell || []).forEach((b) => {
       if (!b || !b.name) return;
       if (classes.some((c) => c.name === b.name)) return;
-      classes.push({ id: uid(), name: String(b.name), start: String(b.start || ''), end: String(b.end || ''), students: [] }); added++;
+      classes.push({ id: uid(), name: String(b.name), period: String(b.period || ''), grade: String(b.grade || ''), custom: !!b.custom || !b.period, start: String(b.start || ''), end: String(b.end || ''), students: [] }); added++;
     });
     saveClasses();
     $('in-code').value = '';
