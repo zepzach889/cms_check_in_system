@@ -281,3 +281,8 @@ span.out-chip { cursor: default; }
 .late-submit .big-btn { width: min(400px, 44vw); height: 120px; font-size: 2.3rem; }
 .big-btn.nopass { background: var(--surface); color: var(--green); border: 4px solid var(--green); box-shadow: 0 6px 0 var(--green); }
 @media (max-width: 900px) { .late-reasons { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.late-reasons { display: flex; flex-direction: column; gap: 14px; }
+.reason-row4 { display: grid; gap: 14px; }
+.pass-q { margin: 0; font-size: 1.4rem; font-weight: 700; color: var(--muted); }
+.late-submit .big-btn.wide { width: min(460px, 60vw); }

@@ -85,6 +85,7 @@
     <label id="other-wrap" class="other-wrap" hidden><span>Tell us a few words <em>(optional)</em></span>
       <input id="other-text" type="text" maxlength="60" autocomplete="off">
     </label>
+    <p id="pass-q" class="pass-q" hidden>Did they give you a pass?</p>
     <div id="late-submit" class="late-submit"></div>
   </section>
 
@@ -229,8 +230,10 @@
       <!-- Copy setup -->
       <section class="card">
         <h2>5. Copy setup to another device</h2>
-        <p class="help">Makes a code with the form connection (and, if you want, your class periods and names). Paste it into another kiosk's setup. It never includes student names, the room name, or the PIN.</p>
-        <label class="check-line"><input id="in-include-bell" type="checkbox" checked> Include class periods and names (no students)</label>
+        <p class="help">Makes a code with the form connection and, if you want, the classes. Paste it into another kiosk's setup. It never includes the room name, PIN, or hall pass settings.</p>
+        <label class="check-line"><input id="in-include-bell" type="checkbox" checked> Include classes (periods and class names)</label>
+        <label class="check-line"><input id="in-include-names" type="checkbox"> Also include student names</label>
+        <p class="help small">Only include names when you're moving a roster between devices yourself. The code isn't secret-proof: don't email it widely or post it anywhere students or others could see.</p>
         <div class="row"><button id="btn-make-code" class="primary-btn" type="button">Make setup code</button></div>
         <textarea id="out-code" rows="3" readonly spellcheck="false" hidden></textarea>
         <label class="field">Paste a setup code from another device

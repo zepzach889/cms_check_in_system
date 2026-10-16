@@ -120,7 +120,7 @@ A handy check: open the form's normal link in an **Incognito window** (Ctrl+Shif
 
 ## Everyday use
 
-- Students tap their name, choose why they're late, and tap **I have a pass** or **No pass**. A green screen confirms the time and resets after 4 seconds. (With hall passes turned on, they tap **I'm late** first.)
+- Students tap their name, choose why they're late, and tap **I'm late** (or, for Office, Nurse, Counselor, and Another teacher, **I have a pass** or **No pass**). A green screen confirms the time and resets after 4 seconds. (With hall passes turned on, they tap **I'm late** first.)
 - **"Not on the list?"** lets a student type their name. Those rows say "(typed in)" in the Sheet.
 - If a student taps their name again within 10 minutes, the kiosk shows "You already checked in" and doesn't send a second row.
 - The **status light** in the top bar:
@@ -139,12 +139,14 @@ These are set once for the whole school in **`settings.js`**, so every room reco
 
 | Setting | Now | What it does |
 |---|---|---|
-| `tardyReasons` | Bus, Office, Nurse, Counselor, Another teacher, Bathroom, Locker, Other | The reason buttons. Eight or fewer fit best (two rows of four). |
+| `reasonsThatAskAboutPass` | Office, Nurse, Counselor, Another teacher | The **top row** of reason buttons. Picking one asks "Did they give you a pass?" with **I have a pass** / **No pass**. |
+| `otherReasons` | Bus, Bathroom, Locker, Other | The **bottom row**. Picking one shows a single **I'm late** button. |
 | `requireReason` | `true` | Students must pick a reason. Set to `false` to make it optional. |
-| `askAboutPass` | `true` | Students finish with **I have a pass** or **No pass**. Set to `false` for a single **I'm late** button. |
 | `otherAsksForDetails` | `true` | Choosing **Other** shows a small optional box to type a few words. |
 
-In the Sheet, Reason shows the button they chose, or "Other: forgot binder" if they typed something. Pass shows Yes or No. If your form doesn't have a Pass question, "(has pass)" is added to the Reason instead, so the answer isn't lost.
+Four buttons per row fit best. To stop asking about passes entirely, move everything into `otherReasons` and leave `reasonsThatAskAboutPass` empty: `[]`.
+
+In the Sheet, Reason shows the button they chose, or "Other: forgot binder" if they typed something. Pass shows Yes or No for top-row reasons, and is blank for bottom-row reasons (the question wasn't asked). If your form doesn't have a Pass question, "(has pass)" is added to the Reason instead, so the answer isn't lost.
 
 "Not on the list?" students also see the reasons screen after typing their name.
 
@@ -232,9 +234,11 @@ When a rule blocks a pass, the "going out" button is grayed out and the kiosk sa
 
 Every room uses the **same form and Sheet**, so you don't make a new form per teacher.
 
-1. On a kiosk that's already working, open setup › **5. Copy setup to another device** › **Make setup code**. The code includes the form connection and, if the box is checked, class names and times (no students). Send it to the other teacher.
+1. On a kiosk that's already working, open setup › **5. Copy setup to another device** › **Make setup code**. The code includes the form connection and, if the box is checked, the classes (periods and class names). Send it to the other teacher.
 2. On the new device, open the kiosk address, create a PIN, paste the code into **Paste a setup code**, and click **Use this code**.
 3. That teacher sets their **room name**, adds student names to each class, and sends a test.
+
+**Moving a roster you typed on a different device:** on the device that has the names, check **Also include student names** before making the code. Paste the code into the kiosk that needs them. If that kiosk already has a class in the same period, it asks whether to replace it with the code's version. A code with names contains real student names, so paste it directly between devices; don't email it widely or post it where others can see.
 
 ---
 

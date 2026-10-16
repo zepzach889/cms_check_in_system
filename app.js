@@ -35,9 +35,13 @@
   let out = load(K.out, []); // hall passes open on this device
   const saveOut = () => save(K.out, out);
   const SET = Object.assign({
-    tardyReasons: ['Bus', 'Office', 'Nurse', 'Counselor', 'Another teacher', 'Bathroom', 'Locker', 'Other'],
-    requireReason: true, askAboutPass: true, otherAsksForDetails: true
+    reasonsThatAskAboutPass: ['Office', 'Nurse', 'Counselor', 'Another teacher'],
+    otherReasons: ['Bus', 'Bathroom', 'Locker', 'Other'],
+    requireReason: true, otherAsksForDetails: true
   }, window.SCHOOL_SETTINGS || {});
+  const PASS_REASONS = (SET.reasonsThatAskAboutPass || []).map(String);
+  const PLAIN_REASONS = (SET.otherReasons || []).map(String);
+  const asksPass = (r) => PASS_REASONS.indexOf(r) !== -1;
   const HALL_DEFAULTS = {
     enabled: false, maxOut: 1, warnMin: 5, alertMin: 10, noStart: 10, noEnd: 10, weekLimit: 0,
     showNames: true, beep: false,
@@ -304,36 +308,46 @@
     $('late-title').textContent = viaHello ? 'Why are you late, ' + pending.first + '?' : 'Hi, ' + pending.first + '! Why are you late?';
     $('late-sub').textContent = SET.requireReason ? 'Pick one.' : 'Pick one, or skip it.';
     const grid = $('late-reasons'); grid.textContent = ''; grid.classList.remove('nudge');
-    SET.tardyReasons.forEach((r) => {
-      const b = el('button', 'reason-btn', r); b.type = 'button';
-      b.setAttribute('aria-pressed', 'false');
-      b.addEventListener('click', () => {
-        reason = reason === r ? '' : r;
-        grid.querySelectorAll('.reason-btn').forEach((x) => x.setAttribute('aria-pressed', String(x.textContent === reason)));
-        grid.classList.remove('nudge');
-        $('late-sub').textContent = SET.requireReason ? 'Pick one.' : 'Pick one, or skip it.';
-        const other = reason === 'Other' && SET.otherAsksForDetails;
-        $('other-wrap').hidden = !other;
-        if (other) { $('other-text').value = ''; setTimeout(() => $('other-text').focus(), 50); }
-        refreshSubmit();
+    // Row 1: reasons that ask about a pass. Row 2: everything else.
+    [PASS_REASONS, PLAIN_REASONS].forEach((row) => {
+      if (!row.length) return;
+      const line = el('div', 'reason-row4');
+      line.style.gridTemplateColumns = 'repeat(' + Math.max(row.length, 4) + ', minmax(0, 1fr))';
+      row.forEach((r) => {
+        const b = el('button', 'reason-btn', r); b.type = 'button';
+        b.dataset.reason = r;
+        b.setAttribute('aria-pressed', 'false');
+        b.addEventListener('click', () => {
+          reason = reason === r ? '' : r;
+          grid.querySelectorAll('.reason-btn').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.reason === reason)));
+          grid.classList.remove('nudge');
+          $('late-sub').textContent = SET.requireReason ? 'Pick one.' : 'Pick one, or skip it.';
+          const other = reason === 'Other' && SET.otherAsksForDetails;
+          $('other-wrap').hidden = !other;
+          if (other) { $('other-text').value = ''; setTimeout(() => $('other-text').focus(), 50); }
+          buildSubmit();
+        });
+        line.appendChild(b);
       });
-      grid.appendChild(b);
+      grid.appendChild(line);
     });
     $('other-wrap').hidden = true; $('other-text').value = '';
+    buildSubmit();
+    show('late');
+  }
+  // Pass reasons end with "I have a pass" / "No pass"; everything else with "I'm late".
+  function buildSubmit() {
     const box = $('late-submit'); box.textContent = '';
+    $('pass-q').hidden = !asksPass(reason);
     const make = (cls, text, pass) => {
       const b = el('button', 'big-btn ' + cls, text); b.type = 'button';
       b.addEventListener('click', () => submitLate(pass));
       box.appendChild(b);
     };
-    if (SET.askAboutPass) { make('', 'I have a pass', 'Yes'); make('nopass', 'No pass', 'No'); }
-    else make('', "I'm late", '');
-    refreshSubmit();
-    show('late');
-  }
-  function refreshSubmit() {
+    if (asksPass(reason)) { make('', 'I have a pass', 'Yes'); make('nopass', 'No pass', 'No'); }
+    else make('wide', "I'm late", '');
     const need = SET.requireReason && !reason;
-    $('late-submit').querySelectorAll('button').forEach((b) => { b.setAttribute('aria-disabled', String(need)); b.style.opacity = need ? '0.45' : ''; });
+    box.querySelectorAll('button').forEach((b) => { b.setAttribute('aria-disabled', String(need)); b.style.opacity = need ? '0.45' : ''; });
   }
   function submitLate(pass) {
     if (!pending) return goHome();
@@ -1112,9 +1126,19 @@
   $('btn-make-code').addEventListener('click', () => {
     if (!formReady()) { const m = $('code-msg'); m.textContent = 'Connect the form first.'; m.className = 'msg bad'; return; }
     const data = { v: 1, formId: config.formId, map: config.map };
-    if ($('in-include-bell').checked) data.bell = classes.map((c) => ({ name: c.name, period: c.period || '', grade: c.grade || '', custom: !!c.custom, start: c.start || '', end: c.end || '' }));
+    const withNames = $('in-include-names').checked;
+    if ($('in-include-bell').checked || withNames) {
+      data.bell = classes.map((c) => {
+        const b = { name: c.name, period: c.period || '', grade: c.grade || '', custom: !!c.custom, start: c.start || '', end: c.end || '' };
+        if (withNames) b.students = (c.students || []).map((s) => [s.first, s.last]);
+        return b;
+      });
+    }
     const out = $('out-code'); out.value = enc(data); out.hidden = false; out.select();
-    try { navigator.clipboard.writeText(out.value); $('code-msg').textContent = 'Code copied. Paste it into the other device\'s setup.'; $('code-msg').className = 'msg ok'; } catch (e) { /* select is enough */ }
+    const m = $('code-msg');
+    m.textContent = withNames ? 'This code includes student names. Paste it straight into the other device, and don\'t post it anywhere others can see.' : 'Paste this code into the other device\'s setup.';
+    m.className = 'msg ok';
+    try { navigator.clipboard.writeText(out.value).then(() => { m.textContent = 'Copied! ' + m.textContent; }).catch(() => {}); } catch (e) { /* select is enough */ }
   });
   $('btn-use-code').addEventListener('click', () => {
     const m = $('code-msg');
@@ -1122,15 +1146,37 @@
     try { data = dec($('in-code').value); } catch (e) { m.textContent = "That code didn't work. Copy the whole code and try again."; m.className = 'msg bad'; return; }
     if (!data || !data.formId || !data.map) { m.textContent = "That code didn't work."; m.className = 'msg bad'; return; }
     config.formId = String(data.formId); config.map = data.map; saveConfig();
-    let added = 0;
-    (data.bell || []).forEach((b) => {
-      if (!b || !b.name) return;
-      if (classes.some((c) => c.name === b.name)) return;
-      classes.push({ id: uid(), name: String(b.name), period: String(b.period || ''), grade: String(b.grade || ''), custom: !!b.custom || !b.period, start: String(b.start || ''), end: String(b.end || ''), students: [] }); added++;
+    const incoming = (data.bell || []).filter((b) => b && b.name);
+    const same = (c, b) => b.period && !b.custom ? (!c.custom && String(c.period) === String(b.period) && String(c.grade || '') === String(b.grade || '')) : c.name === b.name;
+    const clashes = incoming.filter((b) => classes.some((c) => same(c, b)));
+    const hasNames = incoming.some((b) => Array.isArray(b.students) && b.students.length);
+    let replace = false;
+    if (clashes.length) {
+      replace = confirm(clashes.length + ' class' + (clashes.length === 1 ? '' : 'es') + ' in this code ' + (clashes.length === 1 ? 'uses a period' : 'use periods') +
+        ' already set up on this device (' + clashes.map((b) => b.name).join(', ') + ').\n\nOK = replace ' + (clashes.length === 1 ? 'it' : 'them') + ' with the code' + (hasNames ? '\'s version, including names' : '') + '.\nCancel = keep this device\'s ' + (clashes.length === 1 ? 'class' : 'classes') + '.');
+    }
+    let added = 0, replaced = 0, people = 0;
+    incoming.forEach((b) => {
+      const students = Array.isArray(b.students) ? b.students.map((x) => ({ first: String(x[0] || ''), last: String(x[1] || '') })).filter((x) => x.first) : null;
+      const fresh = { name: String(b.name), period: String(b.period || ''), grade: String(b.grade || ''), custom: !!b.custom || !b.period, start: String(b.start || ''), end: String(b.end || '') };
+      const existing = classes.find((c) => same(c, b));
+      if (existing) {
+        if (!replace) return;
+        Object.assign(existing, fresh);
+        if (students) existing.students = students;
+        replaced++;
+      } else {
+        classes.push(Object.assign({ id: uid(), students: students || [] }, fresh)); added++;
+      }
+      if (students) people += students.length;
     });
     saveClasses();
     $('in-code').value = '';
-    m.textContent = 'Form connected' + (added ? ' and ' + added + ' class' + (added === 1 ? '' : 'es') + ' added (add student names next)' : '') + '. Set the room name and send a test.';
+    const bits = [];
+    if (added) bits.push(added + ' class' + (added === 1 ? '' : 'es') + ' added');
+    if (replaced) bits.push(replaced + ' replaced');
+    if (people) bits.push(people + ' student names copied');
+    m.textContent = 'Form connected' + (bits.length ? '; ' + bits.join(', ') : '') + '. Check the room name and send a test.';
     m.className = 'msg ok';
     renderFormCurrent(); renderClassList(); renderModeSelect();
   });

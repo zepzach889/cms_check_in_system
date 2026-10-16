@@ -6,14 +6,19 @@
 
 window.SCHOOL_SETTINGS = {
 
-  // Buttons students choose from when they're late (8 or fewer fit best).
-  // Keep "Other" last if you use it.
-  tardyReasons: [
-    "Bus",
+  // TOP ROW of reason buttons: places that might give a student a pass.
+  // Picking one of these asks "Did they give you a pass?" (I have a pass / No pass).
+  reasonsThatAskAboutPass: [
     "Office",
     "Nurse",
     "Counselor",
-    "Another teacher",
+    "Another teacher"
+  ],
+
+  // BOTTOM ROW of reason buttons: no pass question, just "I'm late".
+  // Keep "Other" last if you use it.
+  otherReasons: [
+    "Bus",
     "Bathroom",
     "Locker",
     "Other"
@@ -22,10 +27,6 @@ window.SCHOOL_SETTINGS = {
   // true  = students must choose a reason before they can check in
   // false = the reason is optional
   requireReason: true,
-
-  // true  = students finish by tapping "I have a pass" or "No pass"
-  // false = students finish with a single "I'm late" button
-  askAboutPass: true,
 
   // true = choosing "Other" shows a small box to type a few words (optional)
   otherAsksForDetails: true
