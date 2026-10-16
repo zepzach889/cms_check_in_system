@@ -160,6 +160,8 @@ The school's bell times live in **`schedule.js`**, and every kiosk reads them fr
 - **Early Release:** Wednesday. Period 5 comes before Period 4 that day, and the kiosk handles that.
 - **Period 4 and lunch** are different for 6th grade and 7th/8th grade, which is why Period 4 classes ask for the grade.
 
+**Bells ring one minute early.** The real bells ring 1 minute before the printed times, so `schedule.js` has a setting at the top, `bellOffsetMinutes: -1`, that moves every start and end time 1 minute earlier. The printed times in the file stay the same as the official schedule. The kiosk switches classes, counts Minutes late, and applies hall pass rules from the real bells. If the bells are ever fixed, change `-1` to `0`. (Classes with **Custom times** use exactly the times typed in setup.)
+
 **Changing times for every kiosk:** on GitHub, open `schedule.js`, click the **pencil icon** (Edit), change the times, and click **Commit changes**. Times can be written like `8:20 AM`. Each kiosk uses the new times the next time it loads (restart the browser or refresh the page to make it immediate).
 
 **Special days you know ahead of time** (early release on a different day, no school, a new assembly schedule): in `schedule.js`, add the date under `specialDays`, for example:

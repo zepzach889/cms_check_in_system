@@ -103,6 +103,13 @@
     if (ap === 'a' && h === 12) h = 0;
     return pad(h) + ':' + m[2];
   }
+  // Bells ring early/late compared with the printed schedule (schedule.js: bellOffsetMinutes).
+  const BELL_OFFSET = parseInt(BELL.bellOffsetMinutes, 10) || 0;
+  function bellTime(t) { // printed "8:20 AM" -> actual bell "08:19"
+    const hhmm = parseTime(t); if (!hhmm) return '';
+    const m = Math.max(0, toMin(hhmm) + BELL_OFFSET);
+    return pad(Math.floor(m / 60)) + ':' + pad(m % 60);
+  }
   function dateKey(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
   function autoScheduleKey(d) {
     const special = (BELL.specialDays || {})[dateKey(d)];
@@ -140,7 +147,7 @@
     if (c.custom || !c.period) return (c.start && c.end) ? { start: c.start, end: c.end } : null;
     const row = periodRow(todayScheduleKey(), c.period, c.grade);
     if (!row) return null;
-    const st = parseTime(row.start), en = parseTime(row.end);
+    const st = bellTime(row.start), en = bellTime(row.end);
     return st && en ? { start: st, end: en } : null;
   }
   function classLabel(c) {
@@ -983,9 +990,9 @@
     const g = $('ce-grade-wrap').hidden ? '' : $('ce-grade').value;
     const parts = Object.keys(SCHEDS).map((k) => {
       const r = periodRow(k, p, g);
-      return scheduleName(k) + ': ' + (r ? fmt12(parseTime(r.start)) + '–' + fmt12(parseTime(r.end)) : 'no class');
+      return scheduleName(k) + ': ' + (r ? fmt12(bellTime(r.start)) + '–' + fmt12(bellTime(r.end)) : 'no class');
     });
-    note.textContent = parts.join(' · ');
+    note.textContent = 'Bell times' + (BELL_OFFSET ? ' (bells ring ' + Math.abs(BELL_OFFSET) + ' min ' + (BELL_OFFSET < 0 ? 'early' : 'late') + ')' : '') + ' — ' + parts.join(' · ');
   }
   $('ce-period').addEventListener('change', () => editorPeriodChanged($('ce-grade').value));
   $('ce-grade').addEventListener('change', editorTimesNote);

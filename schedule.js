@@ -11,6 +11,12 @@
 
 window.BELL_SCHEDULE = {
 
+  // ---- Bell adjustment ----------------------------------------------
+  // Our bells ring 1 minute before the printed times below, so the kiosk
+  // moves every start and end time 1 minute earlier to match the real bells.
+  // If the bells are ever fixed, change -1 to 0.
+  bellOffsetMinutes: -1,
+
   // ---- The schedules ------------------------------------------------
   schedules: {
 

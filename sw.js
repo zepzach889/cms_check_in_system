@@ -1,6 +1,6 @@
 // Lets the kiosk page open even if the internet is down when the device restarts.
 // Always tries the internet first, so updates you push to GitHub show up.
-const CACHE = 'tardy-kiosk-v7';
+const CACHE = 'tardy-kiosk-v8';
 const FILES = ['./', './index.html', './style.css', './schedule.js', './settings.js', './app.js'];
 
 self.addEventListener('install', (e) => {
