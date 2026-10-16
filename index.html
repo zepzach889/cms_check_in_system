@@ -50,9 +50,10 @@
   </section>
 
   <!-- 1b. Choose your class (only when the bell schedule can't tell) -->
-  <section id="screen-pickclass" class="screen center" hidden>
-    <h1>Which class are you late to?</h1>
-    <div id="class-grid" class="class-grid"></div>
+  <section id="screen-idle" class="screen idle" hidden>
+    <p id="idle-clock" class="idle-clock">--:--</p>
+    <h1 id="idle-title">No class right now</h1>
+    <p id="idle-next" class="idle-next"></p>
   </section>
 
   <!-- 2. Hi, name! -->
@@ -167,6 +168,8 @@
           <select id="in-today"></select>
         </label>
         <p class="help">Comes from the school's bell schedule automatically. Change it here only for a surprise schedule; it goes back to normal tomorrow.</p>
+        <label class="check-line"><input id="in-lock" type="checkbox"> Lock-down mode: keep the kiosk full screen and make it harder to leave this page</label>
+        <p class="help small">A web page can't fully lock a device. For a real lock, see "Locking the device" in the guide.</p>
         <div class="field">Teacher PIN
           <div class="row"><button id="btn-change-pin" class="ghost-dark-btn" type="button">Change PIN</button></div>
         </div>

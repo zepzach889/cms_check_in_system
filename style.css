@@ -256,3 +256,11 @@ textarea { resize: vertical; font-family: ui-monospace, Menlo, Consolas, monospa
 .out-chip.alert .t::after { content: " !"; }
 span.out-chip { cursor: default; }
 .today-row button { height: 36px; padding: 0 12px; border-radius: 18px; border: 2px solid var(--line); background: #fff; font-weight: 700; }
+
+/* ---------- No class right now ---------- */
+.idle { align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 4vh 4vw; }
+.idle-clock { margin: 0; font-family: var(--display); font-size: clamp(5rem, 14vw, 10rem); font-weight: 700; color: var(--green); line-height: 1; font-variant-numeric: tabular-nums; }
+.idle h1 { font-size: clamp(2rem, 4vw, 3rem); font-weight: 600; color: var(--ink); }
+.idle-next { margin: 0; font-size: 1.5rem; color: var(--muted); min-height: 1.5em; }
+.idle-next b { color: var(--green-dark); }
+.used-warn { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--err-bg); color: var(--err-ink); font-size: .98rem; font-weight: 700; }

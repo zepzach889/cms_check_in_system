@@ -86,7 +86,8 @@ That address is your kiosk. Bookmark it.
    - **2. This room:** type the room name, like `Room 14`. **Type it exactly the same way every time.** The office and teacher reports sort by this name.
    - **3. Class lists:** click **Add a class**, pick the **Period**, and for Period 4 pick the **grade** (6th grade and 7th/8th grade have different Period 4 times). The class name is optional; it says "Period 3" if you leave it blank. Paste the student names (one per line). "Maya Rivera" and "Rivera, Maya" both work, or upload a CSV with First and Last name columns, like `sample-class-list.csv`. Repeat for each class, including Advisory and electives.
      The times come from the school bell schedule, so you never type them. The editor shows the period's times on each schedule so you can check them. For an unusual class that doesn't follow the bells, choose **Custom times** at the bottom of the Period list.
-   - **Which class shows on the kiosk:** "Switch automatically by bell schedule" shows the class that's in session (or starting within 5 minutes). Between classes, during lunch, or during a prep period, students see a "Which class are you late to?" screen. You can also choose to always show one class.
+   - **Which class shows on the kiosk:** "Switch automatically by bell schedule" shows the class that's in session (or starting within 5 minutes). Between classes, during break, lunch, your prep period, and before or after school, the kiosk shows a large clock with "No class right now" and the next class, with no names. You can also choose to always show one class.
+     Each period can only have one class. Periods that are already used are grayed out in the list. For Period 4, each grade counts separately.
 4. Click **Save & back to kiosk**.
 
 To get back into setup, tap or click the small **gear** in the top corner and enter your PIN. Setup locks itself after 5 idle minutes.
@@ -241,11 +242,33 @@ For your pilot, you can just use the main Sheet yourself.
 
 ---
 
+## Locking the device
+
+A web page can't fully lock a device. Browsers deliberately stop websites from preventing someone from closing a tab or going to another site. The kiosk does what a page can, and the device itself does the rest.
+
+**What the kiosk does: Lock-down mode** (setup, section 2)
+
+- Keeps the kiosk **full screen**. If a student exits full screen, the next tap brings it back.
+- In Chrome, **Esc must be held down** for a couple of seconds to exit full screen, instead of a quick press.
+- If someone tries to close the tab or leave, the browser asks **"Leave site?"**.
+- **Reload, back, print, and similar keys** are blocked, and right-click is turned off.
+- None of this applies on the teacher setup screen.
+
+A determined student could still get around it (for example, by holding Esc, then closing the tab). So pair it with one of these:
+
+**What the device can do (the real lock)**
+
+- **Chromebook:** district IT can set the device up in **kiosk mode** from the Google Admin console, with your kiosk's web address as the only thing it runs. Students can't close it, open other tabs, or sign out. Ask for a "web kiosk app" pointed at your kiosk address.
+- **iPad:** use **Guided Access**, which you can turn on yourself without IT: Settings › Accessibility › Guided Access. Open the kiosk in Safari, triple-click the side or home button, and tap Start. Only your passcode ends it.
+- **Android tablet:** use **App pinning** (Settings › Security › App pinning).
+
+---
+
 ## Asking district IT
 
 Things to request:
 
-- **Kiosk/locked mode** on the dedicated Chromebook, showing only your kiosk address. IT can do this through the Google Admin console.
+- **Kiosk mode** on the dedicated Chromebook, showing only your kiosk address (a "web kiosk app" in the Google Admin console). This is the only true lock on a Chromebook.
 - That **docs.google.com** is reachable from that device (it almost always is).
 - That the device **doesn't go to sleep** during school hours. The page also asks the screen to stay awake where the browser allows it.
 - That the device's browser data **isn't wiped on sign-out** or restart. Class lists and waiting check-ins live there. (Kiosk-mode Chromebooks normally keep it.)

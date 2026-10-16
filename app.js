@@ -8,7 +8,6 @@
   const TIMEOUTS = {
     hello: 20000,      // "Hi, name" screen returns to names after 20 s
     notlisted: 45000,  // typing screen
-    pickclass: 30000,
     done: 4000,        // confirmation screen
     pin: 30000,
     dest: 20000,
@@ -143,7 +142,7 @@
   function weekStart() { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; }
 
   // ---------- Screens & idle timers ----------
-  const STUDENT_SCREENS = ['names', 'pickclass', 'hello', 'notlisted', 'dest'];
+  const STUDENT_SCREENS = ['names', 'idle', 'hello', 'notlisted', 'dest'];
   let current = '';
   let idleTimer = null;
 
@@ -151,9 +150,10 @@
     document.querySelectorAll('.screen').forEach((s) => { s.hidden = s.id !== 'screen-' + name; });
     current = name;
     $('topbar').hidden = STUDENT_SCREENS.indexOf(name) === -1;
-    const onNames = name === 'names' || name === 'pickclass';
+    const onNames = name === 'names' || name === 'idle';
     $('where').hidden = !onNames;
     $('btn-gear').hidden = !onNames;
+    $('clock').hidden = name === 'idle';
     $('btn-back').hidden = onNames;
     $('btn-back-label').textContent = name === 'hello' ? "That's not me" : name === 'dest' ? 'Cancel' : 'Back to names';
     armIdle();
@@ -168,7 +168,6 @@
   ['pointerdown', 'keydown', 'input'].forEach((ev) => document.addEventListener(ev, armIdle, { passive: true }));
 
   // ---------- Which class is showing ----------
-  let pickedClass = null; // { id, until } when a student chose a class from the picker
 
   function activeClass() {
     if (!classes.length) return null;
@@ -179,16 +178,34 @@
     const hit = today.find((x) => m >= toMin(x.t.start) && m <= toMin(x.t.end)) ||
       today.find((x) => m >= toMin(x.t.start) - 5 && m < toMin(x.t.start));
     if (hit) return hit.c;
-    if (pickedClass && Date.now() < pickedClass.until) return classes.find((c) => c.id === pickedClass.id) || null;
     return null;
   }
 
   function goHome() {
     if (!config.pin) { startPin('create'); return; }
     const cls = activeClass();
-    if (!cls && classes.length > 1) { renderClassPicker(); show('pickclass'); updateWhere(null); return; }
-    renderNames(cls || classes[0] || null);
+    if (!cls && classes.length) { renderIdle(); show('idle'); return; }
+    renderNames(cls);
     show('names');
+  }
+
+  // Between classes, lunch, prep, before/after school: a calm clock screen, no names.
+  function renderIdle() {
+    showingClass = null;
+    updateWhere(null);
+    $('idle-clock').textContent = clockText(new Date());
+    const key = todayScheduleKey();
+    const m = nowMin();
+    const next = classes.map((c) => ({ c, t: classTimes(c) })).filter((x) => x.t && toMin(x.t.start) > m)
+      .sort((a, b) => toMin(a.t.start) - toMin(b.t.start))[0];
+    const nx = $('idle-next'); nx.textContent = '';
+    if (key === 'none') { $('idle-title').textContent = 'No school today'; return; }
+    $('idle-title').textContent = 'No class right now';
+    if (next) {
+      nx.appendChild(document.createTextNode('Next: '));
+      nx.appendChild(el('b', null, next.c.name));
+      nx.appendChild(document.createTextNode(' at ' + fmt12(next.t.start)));
+    }
   }
 
   function updateWhere(cls) {
@@ -243,21 +260,7 @@
     const key = (c) => { const t = classTimes(c); return t ? toMin(t.start) : 2000 + (parseFloat(c.period) || 0); };
     return classes.slice().sort((a, b) => key(a) - key(b));
   }
-  function renderClassPicker() {
-    const grid = $('class-grid');
-    grid.textContent = '';
-    sortedClasses().forEach((c) => {
-      const b = el('button', 'class-btn', c.name);
-      b.type = 'button';
-      const t = classTimes(c);
-      b.appendChild(el('small', null, t ? fmt12(t.start) + '–' + fmt12(t.end) : classLabel(c)));
-      b.addEventListener('click', () => {
-        pickedClass = { id: c.id, until: Date.now() + 60 * 60000 };
-        renderNames(c); show('names');
-      });
-      grid.appendChild(b);
-    });
-  }
+
 
   // ---------- Hello / reasons ----------
   let pending = null; // { full, first, typed, label }
@@ -559,7 +562,8 @@
   function tick() {
     $('clock').textContent = clockText(new Date());
     // when the period changes, refresh the name list (only if idle on names)
-    if (current === 'names' || current === 'pickclass') {
+    if (current === 'idle') $('idle-clock').textContent = clockText(new Date());
+    if (current === 'names' || current === 'idle') {
       const a = activeClass();
       const id = a ? a.id : null;
       if (id !== lastActiveId) { lastActiveId = id; goHome(); }
@@ -657,6 +661,8 @@
     renderStatusArea();
     loadHallFields();
     renderSetupOut();
+    $('in-lock').checked = !!config.lock;
+    unlockKeyboard();
     show('setup');
   }
   function loadHallFields() {
@@ -674,6 +680,7 @@
   function saveSetupFields() {
     config.room = $('in-room').value.trim();
     config.mode = $('in-mode').value || 'auto';
+    config.lock = $('in-lock').checked;
     const tv = $('in-today').value;
     config.todaySchedule = (tv && tv !== 'auto') ? { date: dateKey(new Date()), key: tv } : null;
     const d = HALL_DEFAULTS;
@@ -712,8 +719,9 @@
   }
   $('btn-setup-done').addEventListener('click', () => {
     saveSetupFields();
-    pickedClass = null; lastActiveId = null;
+    lastActiveId = null;
     goHome(); flushQueue();
+    if (config.lock) enterFullscreen();
   });
   $('btn-change-pin').addEventListener('click', () => {
     saveSetupFields();
@@ -833,6 +841,14 @@
   function renderClassList() {
     const list = $('class-list'); list.textContent = '';
     if (!classes.length) { list.appendChild(el('p', 'help', 'No classes yet.')); }
+    const seen = {}, dups = [];
+    classes.forEach((c) => {
+      if (c.custom || !c.period) return;
+      const k = c.period + '|' + (c.grade || '');
+      if (seen[k]) dups.push('Period ' + c.period + (c.grade ? ' (' + gradeLabel(c.grade) + ')' : '') + ': ' + seen[k] + ' and ' + c.name);
+      else seen[k] = c.name;
+    });
+    if (dups.length) list.appendChild(el('p', 'used-warn', 'Two classes use the same period — delete one (Edit › Delete class). ' + dups.join('; ')));
     sortedClasses().forEach((c) => {
       const row = el('div', 'class-item');
       const t = el('span');
@@ -850,10 +866,7 @@
     editingId = c ? c.id : null;
     $('ce-title').textContent = c ? 'Edit ' + c.name : 'Add a class';
     $('ce-name').value = c ? c.name : '';
-    const ps = $('ce-period'); ps.textContent = '';
-    allPeriods().forEach((p) => { const o = el('option', null, 'Period ' + p); o.value = p; ps.appendChild(o); });
-    const oc = el('option', null, 'Custom times'); oc.value = 'custom'; ps.appendChild(oc);
-    ps.value = c ? (c.custom || !c.period ? 'custom' : c.period) : (allPeriods()[0] || 'custom');
+    fillPeriodSelect(c ? (c.custom || !c.period ? 'custom' : c.period) : '');
     $('ce-start').value = c && c.start ? c.start : '';
     $('ce-end').value = c && c.end ? c.end : '';
     editorPeriodChanged(c ? c.grade : '');
@@ -865,15 +878,42 @@
     $('ce-name').focus();
   }
   $('btn-add-class').addEventListener('click', () => openEditor(null));
+  // Which class (other than the one being edited) already uses this period/grade?
+  function usedBy(period, grade) {
+    return classes.find((c) => c.id !== editingId && !c.custom && String(c.period) === String(period) && String(c.grade || '') === String(grade || '')) || null;
+  }
+  function periodFull(period) {
+    const grades = gradesFor(period);
+    return grades.length ? grades.every((g) => usedBy(period, g)) : !!usedBy(period, '');
+  }
+  function fillPeriodSelect(selected) {
+    const ps = $('ce-period'); ps.textContent = '';
+    allPeriods().forEach((p) => {
+      const full = periodFull(p);
+      const who = full ? (gradesFor(p).length ? 'already used' : 'already used by ' + usedBy(p, '').name) : '';
+      const o = el('option', null, 'Period ' + p + (full ? ' — ' + who : ''));
+      o.value = p; o.disabled = full; ps.appendChild(o);
+    });
+    const oc = el('option', null, 'Custom times'); oc.value = 'custom'; ps.appendChild(oc);
+    const firstFree = allPeriods().find((p) => !periodFull(p));
+    ps.value = selected && !(selected !== 'custom' && periodFull(selected)) ? selected : (firstFree || 'custom');
+  }
   function editorPeriodChanged(keepGrade) {
     const p = $('ce-period').value;
     const custom = p === 'custom';
     $('ce-custom').hidden = !custom;
     const grades = custom ? [] : gradesFor(p);
     const gs = $('ce-grade'); gs.textContent = '';
-    grades.forEach((g) => { const o = el('option', null, gradeLabel(g)); o.value = g; gs.appendChild(o); });
+    grades.forEach((g) => {
+      const u = usedBy(p, g);
+      const o = el('option', null, gradeLabel(g) + (u ? ' — already used by ' + u.name : ''));
+      o.value = g; o.disabled = !!u; gs.appendChild(o);
+    });
     $('ce-grade-wrap').hidden = !grades.length;
-    if (grades.length) gs.value = grades.indexOf(keepGrade) !== -1 ? keepGrade : grades[0];
+    if (grades.length) {
+      const free = grades.filter((g) => !usedBy(p, g));
+      gs.value = free.indexOf(keepGrade) !== -1 ? keepGrade : (free[0] || grades[0]);
+    }
     editorTimesNote();
   }
   function editorTimesNote() {
@@ -921,6 +961,10 @@
     if (custom) {
       if (!start || !end) { alert('Enter a start and end time, or pick a period.'); return; }
       if (toMin(end) <= toMin(start)) { alert('The end time needs to be after the start time.'); return; }
+    }
+    if (!custom) {
+      const u = usedBy(p, grade);
+      if (u) { alert('Period ' + p + (grade ? ' (' + gradeLabel(grade) + ')' : '') + ' is already used by ' + u.name + '. Edit or delete that class instead.'); return; }
     }
     const name = $('ce-name').value.trim() || (custom ? 'Class ' + fmt12(start) : 'Period ' + p + (grade ? ' (' + gradeLabel(grade) + ')' : ''));
     const students = parseNames($('ce-names').value);
@@ -1052,6 +1096,36 @@
     Object.values(K).forEach((k) => localStorage.removeItem(k));
     location.reload();
   });
+
+  // ---------- Lock-down mode ----------
+  // A web page can't truly lock a device, but this makes leaving harder:
+  // stays full screen (any tap brings it back), Esc must be held to exit full
+  // screen (Chrome), the browser asks "Leave site?", and reload/back keys are blocked.
+  const locked = () => !!config.lock && current !== 'setup';
+  const inField = (t) => t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT');
+  function lockKeyboard() {
+    try { if (navigator.keyboard && navigator.keyboard.lock && document.fullscreenElement) navigator.keyboard.lock().catch(() => {}); } catch (e) { /* not supported */ }
+  }
+  function unlockKeyboard() { try { if (navigator.keyboard && navigator.keyboard.unlock) navigator.keyboard.unlock(); } catch (e) { /* ignore */ } }
+  function enterFullscreen() {
+    const d = document.documentElement;
+    if (document.fullscreenElement || !d.requestFullscreen) return;
+    d.requestFullscreen().then(lockKeyboard).catch(() => {});
+  }
+  document.addEventListener('pointerdown', () => { if (locked()) enterFullscreen(); }, true);
+  document.addEventListener('fullscreenchange', () => { if (document.fullscreenElement && locked()) lockKeyboard(); });
+  window.addEventListener('beforeunload', (e) => { if (locked()) { e.preventDefault(); e.returnValue = ''; } });
+  document.addEventListener('contextmenu', (e) => { if (locked()) e.preventDefault(); });
+  document.addEventListener('keydown', (e) => {
+    if (!locked()) return;
+    const k = e.key, ctrl = e.ctrlKey || e.metaKey;
+    const blocked = k === 'F5' || k === 'F11' || k === 'F12' || k === 'BrowserBack' || k === 'BrowserRefresh' ||
+      (ctrl && /^[rpsuoljhn]$/i.test(k)) || (e.altKey && (k === 'ArrowLeft' || k === 'ArrowRight' || k === 'Home')) ||
+      (k === 'Backspace' && !inField(e.target));
+    if (blocked) { e.preventDefault(); e.stopPropagation(); }
+  }, true);
+  history.pushState(null, '', location.href);
+  window.addEventListener('popstate', () => { if (locked()) history.pushState(null, '', location.href); });
 
   // ---------- Keep the screen awake (where supported) ----------
   let wakeLock = null;
