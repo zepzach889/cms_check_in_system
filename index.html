@@ -59,15 +59,6 @@
   <!-- 2. Hi, name! -->
   <section id="screen-hello" class="screen center" hidden>
     <h1 id="hello-name" class="hello">Hi!</h1>
-    <div id="reasons" class="reasons">
-      <p id="reason-q" class="reason-q">Why are you late? <em>(optional — skip if you want)</em></p>
-      <div id="reason-row" class="reason-row">
-        <button type="button" class="chip" data-reason="Bus" aria-pressed="false">Bus</button>
-        <button type="button" class="chip" data-reason="Office" aria-pressed="false">Office</button>
-        <button type="button" class="chip" data-reason="Another teacher" aria-pressed="false">Another teacher</button>
-        <button type="button" class="chip" data-reason="Other" aria-pressed="false">Other</button>
-      </div>
-    </div>
     <div id="action-row" class="action-row">
       <button id="btn-late" class="big-btn" type="button">
         <svg width="54" height="54" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
@@ -86,6 +77,17 @@
     <p class="idle-note">Goes back to the name list in 20 seconds if nobody taps.</p>
   </section>
 
+  <!-- Why are you late? -->
+  <section id="screen-late" class="screen center late" hidden>
+    <h1 id="late-title" class="late-title">Why are you late?</h1>
+    <p id="late-sub" class="reason-q"></p>
+    <div id="late-reasons" class="late-reasons"></div>
+    <label id="other-wrap" class="other-wrap" hidden><span>Tell us a few words <em>(optional)</em></span>
+      <input id="other-text" type="text" maxlength="60" autocomplete="off">
+    </label>
+    <div id="late-submit" class="late-submit"></div>
+  </section>
+
   <!-- Hall pass: where are you going? -->
   <section id="screen-dest" class="screen center" hidden>
     <h1 id="dest-title" class="dest-title">Where are you going?</h1>
@@ -99,7 +101,7 @@
     <form id="form-notlisted" class="typed-name" autocomplete="off">
       <label>First name <input id="nl-first" type="text" maxlength="40" required></label>
       <label>Last name <input id="nl-last" type="text" maxlength="40" required></label>
-      <button class="big-btn small" type="submit">I'm late</button>
+      <button class="big-btn small" type="submit">Next</button>
     </form>
   </section>
 
@@ -141,7 +143,7 @@
       <!-- Form -->
       <section class="card">
         <h2>1. Connect your Google Form</h2>
-        <p class="help">In Google Forms, open the ⋮ menu › <b>Get pre-filled link</b>. Type the word <b>room</b> in the Room question, <b>student</b> in Student, <b>type</b> in Type, <b>reason</b> in Reason <b>class</b> in Class, <b>time</b> in Kiosk time, <b>minutes</b> in Minutes out, and <b>late</b> in Minutes late. Click <b>Get link</b>, copy it, and paste it here.</p>
+        <p class="help">In Google Forms, open the ⋮ menu › <b>Get pre-filled link</b>. Type the word <b>room</b> in the Room question, <b>student</b> in Student, <b>type</b> in Type, <b>reason</b> in Reason <b>class</b> in Class, <b>time</b> in Kiosk time, <b>minutes</b> in Minutes out, <b>late</b> in Minutes late, and <b>pass</b> in Pass. Click <b>Get link</b>, copy it, and paste it here.</p>
         <label class="field">Pre-filled link
           <textarea id="in-prefill" rows="3" spellcheck="false" placeholder="https://docs.google.com/forms/d/e/…/viewform?usp=pp_url&entry.…"></textarea>
         </label>
@@ -283,6 +285,7 @@
 </main>
 
 <script src="schedule.js"></script>
+<script src="settings.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

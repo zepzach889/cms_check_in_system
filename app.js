@@ -11,6 +11,7 @@
     done: 4000,        // confirmation screen
     pin: 30000,
     dest: 20000,
+    late: 40000,
     setup: 5 * 60000   // setup locks itself after 5 idle minutes
   };
   const DUPLICATE_WINDOW_MIN = 10; // same student tapping again within 10 min isn't sent twice
@@ -33,6 +34,10 @@
   let log = load(K.log, []);
   let out = load(K.out, []); // hall passes open on this device
   const saveOut = () => save(K.out, out);
+  const SET = Object.assign({
+    tardyReasons: ['Bus', 'Office', 'Nurse', 'Counselor', 'Another teacher', 'Bathroom', 'Locker', 'Other'],
+    requireReason: true, askAboutPass: true, otherAsksForDetails: true
+  }, window.SCHOOL_SETTINGS || {});
   const HALL_DEFAULTS = {
     enabled: false, maxOut: 1, warnMin: 5, alertMin: 10, noStart: 10, noEnd: 10, weekLimit: 0,
     showNames: true, beep: false,
@@ -142,7 +147,7 @@
   function weekStart() { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; }
 
   // ---------- Screens & idle timers ----------
-  const STUDENT_SCREENS = ['names', 'idle', 'hello', 'notlisted', 'dest'];
+  const STUDENT_SCREENS = ['names', 'idle', 'hello', 'late', 'notlisted', 'dest'];
   let current = '';
   let idleTimer = null;
 
@@ -155,7 +160,7 @@
     $('btn-gear').hidden = !onNames;
     $('clock').hidden = name === 'idle';
     $('btn-back').hidden = onNames;
-    $('btn-back-label').textContent = name === 'hello' ? "That's not me" : name === 'dest' ? 'Cancel' : 'Back to names';
+    $('btn-back-label').textContent = (name === 'hello' || name === 'late') ? "That's not me" : name === 'dest' ? 'Cancel' : 'Back to names';
     armIdle();
     window.scrollTo(0, 0);
   }
@@ -268,19 +273,18 @@
   function openHello(full, first, typed, label) {
     pending = { full, first, typed, label: label || first };
     reason = '';
-    document.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', 'false'));
-    $('hello-name').textContent = 'Hi, ' + first + '!';
     const h = hall();
     const mine = out.find((o) => o.student === full);
+    // Hall passes off: go straight to "Why are you late?"
+    if (!h.enabled && !mine) { openLate(); return; }
+    $('hello-name').textContent = 'Hi, ' + first + '!';
     const note = $('hall-note');
     note.hidden = true;
     $('action-row').classList.toggle('three', h.enabled && !mine);
-    $('reasons').hidden = !!mine;
     $('btn-late').hidden = !!mine;
     $('btn-out').hidden = !h.enabled || !!mine;
     $('btn-backin').hidden = !h.enabled && !mine;
     $('btn-backin').disabled = !mine;
-    $('reason-q').innerHTML = h.enabled ? 'If you\'re late, why? <em>(optional)</em>' : 'Why are you late? <em>(optional — skip if you want)</em>';
     if (mine) {
       note.textContent = 'Out for ' + mmss(Date.now() - new Date(mine.at)) + ' · ' + mine.dest;
       note.hidden = false;
@@ -291,17 +295,58 @@
     }
     show('hello');
   }
-  document.querySelectorAll('.chip').forEach((chip) => {
-    chip.addEventListener('click', () => {
-      const r = chip.dataset.reason;
-      reason = reason === r ? '' : r;
-      document.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.reason === reason)));
+  $('btn-late').addEventListener('click', () => { if (pending) openLate(); else goHome(); });
+
+  // ---------- Why are you late? ----------
+  function openLate() {
+    reason = '';
+    const viaHello = hall().enabled;
+    $('late-title').textContent = viaHello ? 'Why are you late, ' + pending.first + '?' : 'Hi, ' + pending.first + '! Why are you late?';
+    $('late-sub').textContent = SET.requireReason ? 'Pick one.' : 'Pick one, or skip it.';
+    const grid = $('late-reasons'); grid.textContent = ''; grid.classList.remove('nudge');
+    SET.tardyReasons.forEach((r) => {
+      const b = el('button', 'reason-btn', r); b.type = 'button';
+      b.setAttribute('aria-pressed', 'false');
+      b.addEventListener('click', () => {
+        reason = reason === r ? '' : r;
+        grid.querySelectorAll('.reason-btn').forEach((x) => x.setAttribute('aria-pressed', String(x.textContent === reason)));
+        grid.classList.remove('nudge');
+        $('late-sub').textContent = SET.requireReason ? 'Pick one.' : 'Pick one, or skip it.';
+        const other = reason === 'Other' && SET.otherAsksForDetails;
+        $('other-wrap').hidden = !other;
+        if (other) { $('other-text').value = ''; setTimeout(() => $('other-text').focus(), 50); }
+        refreshSubmit();
+      });
+      grid.appendChild(b);
     });
-  });
-  $('btn-late').addEventListener('click', () => {
+    $('other-wrap').hidden = true; $('other-text').value = '';
+    const box = $('late-submit'); box.textContent = '';
+    const make = (cls, text, pass) => {
+      const b = el('button', 'big-btn ' + cls, text); b.type = 'button';
+      b.addEventListener('click', () => submitLate(pass));
+      box.appendChild(b);
+    };
+    if (SET.askAboutPass) { make('', 'I have a pass', 'Yes'); make('nopass', 'No pass', 'No'); }
+    else make('', "I'm late", '');
+    refreshSubmit();
+    show('late');
+  }
+  function refreshSubmit() {
+    const need = SET.requireReason && !reason;
+    $('late-submit').querySelectorAll('button').forEach((b) => { b.setAttribute('aria-disabled', String(need)); b.style.opacity = need ? '0.45' : ''; });
+  }
+  function submitLate(pass) {
     if (!pending) return goHome();
-    checkIn(pending.typed ? pending.full + ' (typed in)' : pending.full, pending.first, 'Tardy', reason);
-  });
+    if (SET.requireReason && !reason) {
+      const g = $('late-reasons'); g.classList.remove('nudge'); void g.offsetWidth; g.classList.add('nudge');
+      $('late-sub').textContent = 'Pick a reason first.';
+      return;
+    }
+    const extra = $('other-text').value.trim();
+    const why = reason === 'Other' && extra ? 'Other: ' + extra : reason;
+    const student = pending.typed ? pending.full + ' (typed in)' : pending.full;
+    checkIn(student, pending.first, 'Tardy', why, pass);
+  }
   $('btn-out').addEventListener('click', () => { if (pending) openDest(); });
   $('btn-backin').addEventListener('click', () => {
     if (!pending) return goHome();
@@ -319,21 +364,20 @@
     e.preventDefault();
     const f = $('nl-first').value.trim(), l = $('nl-last').value.trim();
     if (!f || !l) return;
-    pending = { full: f + ' ' + l, first: f, typed: true };
-    reason = '';
-    checkIn(f + ' ' + l + ' (typed in)', f, 'Tardy', '');
+    pending = { full: f + ' ' + l, first: f, typed: true, label: f };
+    openLate();
   });
   $('btn-back').addEventListener('click', goHome);
 
   // ---------- Check in ----------
-  function record(student, type, why, minutes, test, late) {
+  function record(student, type, why, minutes, test, late, pass) {
     const now = new Date();
     const entry = {
       id: uid(), at: now.toISOString(), room: config.room || '', student,
-      cls: showingClass ? showingClass.name : '', type, reason: why || '', minutes: minutes == null ? '' : String(minutes), late: late == null ? '' : String(late), test: !!test
+      cls: showingClass ? showingClass.name : '', type, reason: why || '', minutes: minutes == null ? '' : String(minutes), late: late == null ? '' : String(late), pass: pass || '', test: !!test
     };
     queue.push(entry); saveQueue();
-    log.unshift({ id: entry.id, at: entry.at, student, type, reason: entry.reason, minutes: entry.minutes, late: entry.late, sent: false, test: !!test });
+    log.unshift({ id: entry.id, at: entry.at, student, type, reason: entry.reason, minutes: entry.minutes, late: entry.late, pass: entry.pass, sent: false, test: !!test });
     log = log.slice(0, LOG_KEEP); saveLog();
     flushQueue();
     return entry;
@@ -355,17 +399,17 @@
     return head + (why ? ' · ' + why : '');
   }
 
-  function checkIn(student, first, type, why) {
+  function checkIn(student, first, type, why, pass) {
     const now = new Date();
     const recent = log.find((e) => e.student === student && e.type === type && !e.test &&
       (now - new Date(e.at)) < DUPLICATE_WINDOW_MIN * 60000);
     if (recent) {
-      showDone('You already checked in at ' + clockText(new Date(recent.at)) + '.', 'Have a seat, ' + first + '.', lateText(recent.late, recent.reason));
+      showDone('You already checked in at ' + clockText(new Date(recent.at)) + '.', 'Have a seat, ' + first + '.', lateText(recent.late, recent.reason) + (recent.pass === 'Yes' ? ' · Has a pass' : ''));
       return;
     }
     const late = minutesLate(now.getTime());
-    record(student, type, why, '', false, late);
-    showDone("You're checked in at " + clockText(now) + '.', 'Have a seat, ' + first + '.', lateText(late, why));
+    record(student, type, why, '', false, late, pass);
+    showDone("You're checked in at " + clockText(now) + '.', 'Have a seat, ' + first + '.', lateText(late, why) + (pass === 'Yes' ? ' · Has a pass' : ''));
   }
 
   // ---------- Hall passes ----------
@@ -506,7 +550,9 @@
     const m = config.map || {}, p = new URLSearchParams();
     const add = (field, value) => { if (m[field]) p.append(m[field], value); };
     add('room', e.room); add('student', e.student); add('type', e.type);
-    add('reason', e.reason); add('cls', e.cls); add('time', stamp(new Date(e.at))); add('minutes', e.minutes || ''); add('late', e.late || '');
+    // No Pass question on the form? Put it in Reason instead so it isn't lost.
+    add('reason', e.reason + (!m.pass && e.pass === 'Yes' ? ' (has pass)' : ''));
+    add('pass', e.pass || ''); add('cls', e.cls); add('time', stamp(new Date(e.at))); add('minutes', e.minutes || ''); add('late', e.late || '');
     return p;
   }
   function sendOne(e) {
@@ -756,6 +802,7 @@
     { key: 'cls', label: 'Class / period', words: ['class', 'period'] },
     { key: 'minutes', label: 'Minutes out', words: ['minute'] },
     { key: 'late', label: 'Minutes late', words: ['late'] },
+    { key: 'pass', label: 'Pass', words: ['pass'] },
     { key: 'time', label: 'Kiosk time', words: ['time', 'kiosk'] }
   ];
   let parsed = null;
@@ -1047,7 +1094,7 @@
     rows.forEach((l) => {
       const r = el('div', 'today-row');
       r.appendChild(el('span', null, clockText(new Date(l.at))));
-      r.appendChild(el('span', null, l.student + ' · ' + (l.type === 'Tardy' ? 'Late' : l.type) + (l.reason ? ' · ' + l.reason : '') + (l.minutes ? ' · ' + l.minutes + ' min' : '') + (l.late ? ' · ' + l.late + ' min late' : '')));
+      r.appendChild(el('span', null, l.student + ' · ' + (l.type === 'Tardy' ? 'Late' : l.type) + (l.reason ? ' · ' + l.reason : '') + (l.minutes ? ' · ' + l.minutes + ' min' : '') + (l.late ? ' · ' + l.late + ' min late' : '') + (l.pass === 'Yes' ? ' · pass' : '')));
       const waiting = queue.some((q) => q.id === l.id);
       r.appendChild(el('span', waiting ? 'w' : 's', waiting ? 'Waiting' : 'Sent'));
       box.appendChild(r);

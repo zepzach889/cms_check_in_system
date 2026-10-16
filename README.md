@@ -12,6 +12,7 @@ Synergy stays the official attendance record. This is a convenience log.
 |---|---|
 | `index.html` | The kiosk page |
 | `style.css` | Colors and layout (school green, gold, and white) |
+| `settings.js` | School-wide settings: the tardy reasons, whether a reason is required, and the pass question |
 | `schedule.js` | The school's bell schedule (Regular Day and Wednesday Early Release). Edit this to change times for every kiosk |
 | `app.js` | How the kiosk works |
 | `sw.js` | Lets the page open even if the internet is down when the device restarts |
@@ -27,18 +28,19 @@ The page contains **no student names**. Class lists are typed or imported on eac
 Use the school's Google account (or your own school account for the pilot; see "Moving the form to the office later" below).
 
 1. Go to **forms.google.com** and start a blank form. Name it something like "Tardy Kiosk Log."
-2. Add these eight questions **in this order**. Make every one a **Short answer** question, and leave **Required turned off** on all of them.
+2. Add these nine questions **in this order**. Make every one a **Short answer** question, and leave **Required turned off** on all of them.
 
 | # | Question title | What the kiosk fills in |
 |---|---|---|
 | 1 | `Room` | Room 14 |
 | 2 | `Student` | Maya Rivera |
 | 3 | `Type` | Tardy, Hall pass out, Back, or Not signed back in |
-| 4 | `Reason` | Why they were late, or where they went on a hall pass |
+| 4 | `Reason` | Why they were late (for example "Bathroom" or "Other: forgot binder"), or where they went on a hall pass |
 | 5 | `Class` | Period 3 – World History |
 | 6 | `Kiosk time` | The time the student actually tapped |
 | 7 | `Minutes out` | How long a hall pass lasted (blank for tardies) |
 | 8 | `Minutes late` | How many minutes after class started the student tapped (tardies only) |
+| 9 | `Pass` | Yes or No: did the late student have a pass |
 
    **Why no Required questions?** If a required question arrives blank, Google rejects the whole entry, and the kiosk has no way to know. Reason, Minutes out and Minutes late are often blank on purpose.
 
@@ -47,13 +49,13 @@ Use the school's Google account (or your own school account for the pilot; see "
 3. Open the **Settings** tab › **Responses**:
    - **Collect email addresses:** **Do not collect.** ("Verified" requires a sign-in, which silently blocks the kiosk.)
    - **Limit to 1 response:** off.
-4. Open the **Responses** tab and click **Link to Sheets** › **Create a new spreadsheet**. Its columns will be: Timestamp, Room, Student, Type, Reason, Class, Kiosk time, Minutes out, Minutes late. This Sheet is the shared record.
+4. Open the **Responses** tab and click **Link to Sheets** › **Create a new spreadsheet**. Its columns will be: Timestamp, Room, Student, Type, Reason, Class, Kiosk time, Minutes out, Minutes late, Pass. This Sheet is the shared record.
 5. **Publish the form.** New Google Forms start out unpublished and won't accept anything until you click **Publish** (top right). When it asks who can respond, choose **anyone with the link** (see Step 4 for why).
 
 **Get the pre-filled link** (this is how the kiosk learns each question's hidden code):
 
 1. In the form editor, click the **⋮** menu (top right) › **Get pre-filled link**.
-2. Type these words in the boxes: `room`, `student`, `type`, `reason`, `class`, `time`, `minutes`, `late` (one in each matching box). **Fill in every box** — Google leaves a question out of the link if its box is empty.
+2. Type these words in the boxes: `room`, `student`, `type`, `reason`, `class`, `time`, `minutes`, `late`, `pass` (one in each matching box). **Fill in every box** — Google leaves a question out of the link if its box is empty.
 3. Click **Get link**, then **Copy link**. Paste it somewhere safe.
 
 This doesn't submit anything. The words are just labels so the kiosk can tell which hidden code belongs to which question.
@@ -118,7 +120,7 @@ A handy check: open the form's normal link in an **Incognito window** (Ctrl+Shif
 
 ## Everyday use
 
-- Students tap their name, can choose a reason, and tap **I'm late**. A green screen confirms the time and resets after 4 seconds.
+- Students tap their name, choose why they're late, and tap **I have a pass** or **No pass**. A green screen confirms the time and resets after 4 seconds. (With hall passes turned on, they tap **I'm late** first.)
 - **"Not on the list?"** lets a student type their name. Those rows say "(typed in)" in the Sheet.
 - If a student taps their name again within 10 minutes, the kiosk shows "You already checked in" and doesn't send a second row.
 - The **status light** in the top bar:
@@ -128,6 +130,23 @@ A handy check: open the form's normal link in an **Incognito window** (Ctrl+Shif
 - **Today on this device** (in setup) lists today's check-ins on that kiosk, marked Sent or Waiting.
 
 **Important:** "Sent" means the device handed the check-in to Google. Google doesn't send a reply back, so the kiosk can't confirm it arrived. The Sheet is always the real record.
+
+---
+
+## Tardy reasons and the pass question
+
+These are set once for the whole school in **`settings.js`**, so every room records the same categories and the office's reports line up. To change them, open `settings.js` on GitHub, click the **pencil icon**, edit, and **Commit changes**.
+
+| Setting | Now | What it does |
+|---|---|---|
+| `tardyReasons` | Bus, Office, Nurse, Counselor, Another teacher, Bathroom, Locker, Other | The reason buttons. Eight or fewer fit best (two rows of four). |
+| `requireReason` | `true` | Students must pick a reason. Set to `false` to make it optional. |
+| `askAboutPass` | `true` | Students finish with **I have a pass** or **No pass**. Set to `false` for a single **I'm late** button. |
+| `otherAsksForDetails` | `true` | Choosing **Other** shows a small optional box to type a few words. |
+
+In the Sheet, Reason shows the button they chose, or "Other: forgot binder" if they typed something. Pass shows Yes or No. If your form doesn't have a Pass question, "(has pass)" is added to the Reason instead, so the answer isn't lost.
+
+"Not on the list?" students also see the reasons screen after typing their name.
 
 ---
 
@@ -229,7 +248,7 @@ Every room uses the **same form and Sheet**, so you don't make a new form per te
 2. In cell A1, paste this (replace the link with the main Sheet's address and the room name with the teacher's):
 
    ```
-   =QUERY(IMPORTRANGE("PASTE-MAIN-SHEET-LINK-HERE", "Form Responses 1!A:I"), "select * where Col2 = 'Room 14'", 1)
+   =QUERY(IMPORTRANGE("PASTE-MAIN-SHEET-LINK-HERE", "Form Responses 1!A:J"), "select * where Col2 = 'Room 14'", 1)
    ```
 
    `Col2` means the second column. That's Room if Room is the first question on the form (the first column is always Google's timestamp). If you added the questions in a different order, change the number.
