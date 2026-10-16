@@ -26,7 +26,7 @@ The page contains **no student names**. Class lists are typed or imported on eac
 Use the school's Google account (or your own school account for the pilot; see "Moving the form to the office later" below).
 
 1. Go to **forms.google.com** and start a blank form. Name it something like "Tardy Kiosk Log."
-2. Add these seven questions **in this order**. Make every one a **Short answer** question, and leave **Required turned off** on all of them.
+2. Add these eight questions **in this order**. Make every one a **Short answer** question, and leave **Required turned off** on all of them.
 
 | # | Question title | What the kiosk fills in |
 |---|---|---|
@@ -37,21 +37,22 @@ Use the school's Google account (or your own school account for the pilot; see "
 | 5 | `Class` | Period 3 – World History |
 | 6 | `Kiosk time` | The time the student actually tapped |
 | 7 | `Minutes out` | How long a hall pass lasted (blank for tardies) |
+| 8 | `Minutes late` | How many minutes after class started the student tapped (tardies only) |
 
-   **Why no Required questions?** If a required question arrives blank, Google rejects the whole entry, and the kiosk has no way to know. Reason and Minutes out are often blank on purpose.
+   **Why no Required questions?** If a required question arrives blank, Google rejects the whole entry, and the kiosk has no way to know. Reason, Minutes out and Minutes late are often blank on purpose.
 
    **Why Kiosk time?** If the internet is down, a check-in may reach Google later. Google's Timestamp column shows when it *arrived*; Kiosk time shows when the student *tapped*.
 
 3. Open the **Settings** tab › **Responses**:
    - **Collect email addresses:** **Do not collect.** ("Verified" requires a sign-in, which silently blocks the kiosk.)
    - **Limit to 1 response:** off.
-4. Open the **Responses** tab and click **Link to Sheets** › **Create a new spreadsheet**. Its columns will be: Timestamp, Room, Student, Type, Reason, Class, Kiosk time, Minutes out. This Sheet is the shared record.
+4. Open the **Responses** tab and click **Link to Sheets** › **Create a new spreadsheet**. Its columns will be: Timestamp, Room, Student, Type, Reason, Class, Kiosk time, Minutes out, Minutes late. This Sheet is the shared record.
 5. **Publish the form.** New Google Forms start out unpublished and won't accept anything until you click **Publish** (top right). When it asks who can respond, choose **anyone with the link** (see Step 4 for why).
 
 **Get the pre-filled link** (this is how the kiosk learns each question's hidden code):
 
 1. In the form editor, click the **⋮** menu (top right) › **Get pre-filled link**.
-2. Type these words in the boxes: `room`, `student`, `type`, `reason`, `class`, `time`, `minutes` (one in each matching box).
+2. Type these words in the boxes: `room`, `student`, `type`, `reason`, `class`, `time`, `minutes`, `late` (one in each matching box). **Fill in every box** — Google leaves a question out of the link if its box is empty.
 3. Click **Get link**, then **Copy link**. Paste it somewhere safe.
 
 This doesn't submit anything. The words are just labels so the kiosk can tell which hidden code belongs to which question.
@@ -127,6 +128,17 @@ A handy check: open the form's normal link in an **Incognito window** (Ctrl+Shif
 
 ---
 
+## How "Minutes late" is figured
+
+When a student taps **I'm late**, the kiosk counts the whole minutes since that class's **start time** in setup. A student who taps at 9:21:40 for a class starting at 9:15 is **6** minutes late. The green screen shows it too ("6 minutes late · Bus").
+
+- It's only as accurate as the bell times in setup (section 3), so double-check them.
+- If the kiosk doesn't know which class is in session right now, Minutes late is left blank rather than guessed. That happens with a class that has no times, or "Always show" used outside that class's hours.
+- Tapping during the 5 minutes before the bell, or within the first minute, counts as 0.
+- Check-ins that wait for the internet keep the minutes figured when the student tapped.
+
+---
+
 ## Hall passes
 
 Hall passes are **off** until you turn them on in setup, section **6. Hall passes**.
@@ -187,7 +199,7 @@ Every room uses the **same form and Sheet**, so you don't make a new form per te
 2. In cell A1, paste this (replace the link with the main Sheet's address and the room name with the teacher's):
 
    ```
-   =QUERY(IMPORTRANGE("PASTE-MAIN-SHEET-LINK-HERE", "Form Responses 1!A:H"), "select * where Col2 = 'Room 14'", 1)
+   =QUERY(IMPORTRANGE("PASTE-MAIN-SHEET-LINK-HERE", "Form Responses 1!A:I"), "select * where Col2 = 'Room 14'", 1)
    ```
 
    `Col2` means the second column. That's Room if Room is the first question on the form (the first column is always Google's timestamp). If you added the questions in a different order, change the number.

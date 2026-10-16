@@ -235,17 +235,33 @@
   $('btn-back').addEventListener('click', goHome);
 
   // ---------- Check in ----------
-  function record(student, type, why, minutes, test) {
+  function record(student, type, why, minutes, test, late) {
     const now = new Date();
     const entry = {
       id: uid(), at: now.toISOString(), room: config.room || '', student,
-      cls: showingClass ? showingClass.name : '', type, reason: why || '', minutes: minutes == null ? '' : String(minutes), test: !!test
+      cls: showingClass ? showingClass.name : '', type, reason: why || '', minutes: minutes == null ? '' : String(minutes), late: late == null ? '' : String(late), test: !!test
     };
     queue.push(entry); saveQueue();
-    log.unshift({ id: entry.id, at: entry.at, student, type, reason: entry.reason, minutes: entry.minutes, sent: false, test: !!test });
+    log.unshift({ id: entry.id, at: entry.at, student, type, reason: entry.reason, minutes: entry.minutes, late: entry.late, sent: false, test: !!test });
     log = log.slice(0, LOG_KEEP); saveLog();
     flushQueue();
     return entry;
+  }
+
+  // Minutes after the class's start time. Blank if the kiosk doesn't know a class
+  // that is in session right now (so "Always show" outside class time can't give odd numbers).
+  function minutesLate(now) {
+    const c = showingClass;
+    if (!c || !c.start || !c.end) return '';
+    const st = new Date(now); st.setHours(0, 0, 0, 0); st.setMinutes(toMin(c.start));
+    const en = new Date(now); en.setHours(0, 0, 0, 0); en.setMinutes(toMin(c.end));
+    if (now < st.getTime() - 5 * 60000 || now >= en.getTime() + 60000) return '';
+    return String(Math.max(0, Math.floor((now - st) / 60000)));
+  }
+  function lateText(late, why) {
+    const n = parseInt(late, 10);
+    const head = n > 0 ? n + ' minute' + (n === 1 ? '' : 's') + ' late' : 'Late';
+    return head + (why ? ' · ' + why : '');
   }
 
   function checkIn(student, first, type, why) {
@@ -253,11 +269,12 @@
     const recent = log.find((e) => e.student === student && e.type === type && !e.test &&
       (now - new Date(e.at)) < DUPLICATE_WINDOW_MIN * 60000);
     if (recent) {
-      showDone('You already checked in at ' + clockText(new Date(recent.at)) + '.', 'Have a seat, ' + first + '.', 'Late' + (recent.reason ? ' · ' + recent.reason : ''));
+      showDone('You already checked in at ' + clockText(new Date(recent.at)) + '.', 'Have a seat, ' + first + '.', lateText(recent.late, recent.reason));
       return;
     }
-    record(student, type, why, '');
-    showDone("You're checked in at " + clockText(now) + '.', 'Have a seat, ' + first + '.', 'Late' + (why ? ' · ' + why : ''));
+    const late = minutesLate(now.getTime());
+    record(student, type, why, '', false, late);
+    showDone("You're checked in at " + clockText(now) + '.', 'Have a seat, ' + first + '.', lateText(late, why));
   }
 
   // ---------- Hall passes ----------
@@ -397,7 +414,7 @@
     const m = config.map || {}, p = new URLSearchParams();
     const add = (field, value) => { if (m[field]) p.append(m[field], value); };
     add('room', e.room); add('student', e.student); add('type', e.type);
-    add('reason', e.reason); add('cls', e.cls); add('time', stamp(new Date(e.at))); add('minutes', e.minutes || '');
+    add('reason', e.reason); add('cls', e.cls); add('time', stamp(new Date(e.at))); add('minutes', e.minutes || ''); add('late', e.late || '');
     return p;
   }
   function sendOne(e) {
@@ -630,6 +647,7 @@
     { key: 'reason', label: 'Reason', words: ['reason'] },
     { key: 'cls', label: 'Class / period', words: ['class', 'period'] },
     { key: 'minutes', label: 'Minutes out', words: ['minute'] },
+    { key: 'late', label: 'Minutes late', words: ['late'] },
     { key: 'time', label: 'Kiosk time', words: ['time', 'kiosk'] }
   ];
   let parsed = null;
@@ -849,7 +867,7 @@
     rows.forEach((l) => {
       const r = el('div', 'today-row');
       r.appendChild(el('span', null, clockText(new Date(l.at))));
-      r.appendChild(el('span', null, l.student + ' · ' + (l.type === 'Tardy' ? 'Late' : l.type) + (l.reason ? ' · ' + l.reason : '') + (l.minutes ? ' · ' + l.minutes + ' min' : '')));
+      r.appendChild(el('span', null, l.student + ' · ' + (l.type === 'Tardy' ? 'Late' : l.type) + (l.reason ? ' · ' + l.reason : '') + (l.minutes ? ' · ' + l.minutes + ' min' : '') + (l.late ? ' · ' + l.late + ' min late' : '')));
       const waiting = queue.some((q) => q.id === l.id);
       r.appendChild(el('span', waiting ? 'w' : 's', waiting ? 'Waiting' : 'Sent'));
       box.appendChild(r);
